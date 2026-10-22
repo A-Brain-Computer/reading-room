@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d0a07">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>The Reading Room</title>
+<meta name="description" content="A walkable library of 256 free books. Begin with the slave narratives in their own words, then the radical tradition and Black history the world over. Read together: whoever opens the link walks into the same library.">
+<link rel="canonical" href="https://library.jordanstrudwick.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="The Reading Room">
+<meta property="og:title" content="The Reading Room">
+<meta property="og:description" content="A walkable library of 256 free books. Begin with the slave narratives in their own words, then the radical tradition and Black history the world over. Read together: whoever opens the link walks into the same library.">
+<meta property="og:url" content="https://library.jordanstrudwick.com/">
+<meta name="twitter:card" content="summary">
+<style>#home{display:none!important}</style>
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root{
+  --bg:#0d0a07; --panel:rgba(22,15,9,.9); --line:rgba(232,176,75,.32); --ink:#f2e8d5; --dim:#b3a183; --gold:#e8b04b; --gold2:#ffd98a;
+  --red:#e04a3a; --green:#2e9e5b;
+  --paper:#f3ead6; --paper2:#e9dcc0; --pink:#2a2018; --pdim:#7a6a52;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+  --hand:"Bradley Hand","Segoe Print","Noteworthy","Chalkboard SE","Comic Neue",cursive;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;overscroll-behavior:none;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+#gl{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none;outline:none}
+[hidden]{display:none!important}
+
+/* ---------- chips ---------- */
+.chip{appearance:none;border:1px solid var(--line);background:rgba(13,10,7,.72);color:var(--gold);border-radius:12px;padding:8px 11px;
+  font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;min-height:40px;text-decoration:none;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.chip:hover,.chip:focus-visible{border-color:var(--gold);outline:none}
+.chip svg{width:18px;height:18px;flex:none}
+.chip[aria-pressed="true"]{background:rgba(232,176,75,.2);border-color:var(--gold)}
+.chip .lbl{font-size:12px;letter-spacing:.04em}
+#home{position:fixed;z-index:30;left:calc(var(--sal) + 12px);top:calc(var(--sat) + 10px)}
+#tools{position:fixed;z-index:30;right:calc(var(--sar) + 12px);top:calc(var(--sat) + 10px);display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 120px)}
+body:not(.playing) #tools,body.reading #tools,body.reading #home,body.reading #bar,body.reading #chat{display:none}
+@media (max-width:640px){ #tools .lbl{display:none} #tools{gap:5px} #tools .chip{padding:8px 9px} #home .lbl{display:none} }
+
+/* ---------- title ---------- */
+#title{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;
+  padding:calc(var(--sat) + 60px) calc(var(--sar) + 16px) calc(var(--sab) + 20px) calc(var(--sal) + 16px);
+  background:radial-gradient(ellipse at 50% 30%,rgba(60,36,18,.55),rgba(10,7,4,.92) 70%)}
+#title.gone{display:none}
+#title::before,#title::after{content:"";flex:1 1 0}
+.logo{text-align:center}
+.logo .t{font-family:var(--serif);font-weight:700;letter-spacing:.16em;color:var(--gold2);font-size:clamp(30px,7vw,64px);line-height:1.05;
+  text-shadow:0 3px 0 #5a3610,0 10px 40px rgba(232,176,75,.25)}
+.logo .s{margin-top:10px;color:var(--ink);opacity:.9;font-size:clamp(14px,3.4vw,18px)}
+.epi{margin:18px auto 6px;max-width:560px;font-family:var(--serif);font-style:italic;color:var(--dim);text-align:center;font-size:15px;line-height:1.5}
+.epi b{display:block;font-style:normal;font-weight:400;font-size:12px;letter-spacing:.08em;margin-top:4px;color:#8f7d60}
+.invite-note{margin:12px 0 0;padding:10px 14px;border:1px solid var(--gold);border-radius:12px;background:rgba(232,176,75,.12);color:var(--gold2);font-weight:700;text-align:center;max-width:520px}
+.pick-h{margin:22px 0 10px;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);text-align:center}
+#who{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;width:min(860px,100%)}
+@media (max-width:640px){ #who{grid-template-columns:repeat(4,minmax(0,1fr))} .who img,.who .ph{aspect-ratio:1/1} }
+@media (max-height:700px){ .who img,.who .ph{aspect-ratio:1/1} }
+.who.locked img,.who.locked .ph{filter:brightness(0);opacity:.85}
+.who.locked .q{position:absolute;left:0;right:0;top:22%;text-align:center;font:800 44px/1 var(--serif);color:rgba(232,176,75,.55)}
+.who.locked .n{color:var(--dim)}
+.who.locked .y{color:var(--gold2)}
+.who{position:relative;border:1px solid var(--line);border-radius:14px;background:rgba(26,18,10,.85);padding:0 0 8px;overflow:hidden;text-align:center;min-height:44px}
+.who img,.who .ph{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:radial-gradient(circle at 50% 35%,#4a3018,#1a120a 75%)}
+.who .n{display:block;font-weight:800;font-size:13px;margin-top:6px;color:var(--ink);line-height:1.15;padding:0 4px}
+.who .y{display:block;font-size:11px;color:var(--dim);margin-top:2px}
+.who[aria-pressed="true"]{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset,0 6px 20px rgba(232,176,75,.2)}
+.who:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.row2{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.field{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:6px 10px;background:rgba(13,10,7,.6)}
+.field label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.field input{background:none;border:0;outline:none;width:140px;font-weight:700;color:var(--gold2);font-size:16px}
+.big{appearance:none;border:0;border-radius:14px;padding:14px 26px;font-weight:900;font-size:18px;letter-spacing:.06em;color:#2a1606;
+  background:linear-gradient(180deg,#ffd98a,#e8a93b);box-shadow:0 4px 0 #8a5514,0 10px 24px rgba(0,0,0,.45);min-height:52px}
+.big:active{transform:translateY(2px);box-shadow:0 2px 0 #8a5514}
+.big:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.link{appearance:none;background:none;border:0;color:var(--dim);text-decoration:underline;text-underline-offset:3px;padding:10px;font-size:14px}
+.keys{margin-top:14px;color:var(--dim);font-size:12.5px;text-align:center;line-height:1.7;max-width:640px}
+.keys b{color:var(--gold)}
+@media (pointer:coarse){ .keys .kb{display:none} }
+@media (pointer:fine){ .keys .tp{display:none} }
+#loadmsg{margin-top:10px;color:var(--dim);font-size:13px;min-height:18px;text-align:center}
+
+/* ---------- play HUD ---------- */
+#cross{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,240,210,.7);box-shadow:0 0 0 1.5px rgba(0,0,0,.5);z-index:5;pointer-events:none}
+body:not(.playing) #cross,body.touch #cross,body.mouse-hover #cross{display:none}
+body.playing.touch.zoomed #cross{display:block;width:10px;height:10px;margin:-5px 0 0 -5px;background:none;box-shadow:0 0 0 1.5px rgba(255,240,210,.85),0 0 0 3px rgba(0,0,0,.4)}
+@media (max-width:640px){ #tools{max-width:calc(100vw - 84px)} }
+#bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sab) + 14px);z-index:20;display:flex;flex-direction:column;align-items:center;gap:8px;
+  max-width:calc(100vw - 24px);pointer-events:none}
+body:not(.playing) #bar{display:none}
+#prompt{font-family:var(--serif);font-size:16px;color:var(--ink);text-shadow:0 1px 3px #000,0 0 12px rgba(0,0,0,.8);text-align:center;min-height:20px;padding:0 10px}
+#prompt i{color:var(--gold2);font-style:italic}
+#acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;pointer-events:auto}
+.act{appearance:none;border:1px solid var(--line);background:rgba(13,10,7,.82);color:var(--ink);border-radius:12px;padding:9px 14px;font-weight:700;font-size:14px;
+  min-height:44px;display:inline-flex;align-items:center;gap:8px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.act.primary{border-color:var(--gold);color:var(--gold2)}
+.act kbd{font:800 11px ui-monospace,Menlo,monospace;color:var(--bg);background:var(--gold);border-radius:5px;padding:2px 5px}
+body.touch .act kbd{display:none}
+.act:focus-visible{outline:2px solid #fff}
+#hand{display:none;align-items:center;gap:8px;font-size:13px;color:var(--dim);pointer-events:auto}
+#hand.on{display:flex}
+#hand .sw{width:12px;height:18px;border-radius:2px;box-shadow:inset -2px 0 0 rgba(0,0,0,.35)}
+#hand b{color:var(--ink);font-family:var(--serif);font-weight:600}
+#toast{position:fixed;left:50%;top:calc(var(--sat) + 64px);transform:translate(-50%,-8px);z-index:45;background:rgba(13,10,7,.92);border:1px solid var(--line);color:var(--ink);
+  border-radius:12px;padding:10px 16px;font-size:14px;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:min(560px,calc(100vw - 24px));text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+#arrBanner{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--sat) + 60px);z-index:21;background:rgba(232,176,75,.95);color:#2a1606;font-weight:900;
+  letter-spacing:.08em;font-size:12px;text-transform:uppercase;border-radius:999px;padding:6px 14px;pointer-events:none}
+#stick{position:fixed;z-index:15;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:2px solid rgba(232,176,75,.35);background:rgba(13,10,7,.25);pointer-events:none;display:none}
+#stick i{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(232,176,75,.55)}
+#tags{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden}
+.tag{position:absolute;transform:translate(-50%,-100%);text-align:center;white-space:nowrap}
+.tag .nm{display:inline-block;background:rgba(13,10,7,.75);border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;font-weight:800;color:var(--gold2)}
+.tag .rd{display:block;font-size:11px;color:var(--ink);text-shadow:0 1px 2px #000;margin-top:2px;font-family:var(--serif);font-style:italic}
+.tag .say{display:block;max-width:240px;white-space:normal;margin:0 auto 4px;background:var(--paper);color:var(--pink);border-radius:12px;padding:6px 10px;font-size:13px;
+  font-family:var(--serif);box-shadow:0 4px 12px rgba(0,0,0,.4)}
+#chat{position:fixed;left:calc(var(--sal) + 12px);bottom:calc(var(--sab) + 14px);z-index:22;width:min(320px,calc(100vw - 24px));display:none}
+body.shared #chat{display:block}
+/* in a shared room the chat keeps the bottom-left corner: the prompt and its buttons centre in the
+   space beside it, or, on a narrow screen, the chat sits above them */
+@media (min-width:761px){ body.shared #bar{left:calc(var(--sal) + 344px);right:12px;transform:none;max-width:none} }
+@media (max-width:760px){ body.shared #chat{bottom:calc(var(--sab) + 128px)} body.shared #chatlog{max-height:84px} }
+#chatlog{max-height:150px;overflow-y:auto;font-size:13px;line-height:1.35;text-shadow:0 1px 2px #000;margin-bottom:6px;scrollbar-width:none}
+#chatlog div b{color:var(--gold2)}
+#chatlog div.sys{color:var(--dim);font-style:italic}
+#chatin{width:100%;border:1px solid var(--line);background:rgba(13,10,7,.8);border-radius:10px;padding:8px 10px;outline:none;color:var(--ink);font-size:14px}
+#chatin:focus{border-color:var(--gold)}
+body.touch.shared #bar{bottom:calc(var(--sab) + 70px)}
+
+/* ---------- sheets (catalog, invite, arrange, help) ---------- */
+.sheet{position:fixed;z-index:50;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,3,2,.55);padding:calc(var(--sat) + 14px) calc(var(--sar) + 14px) calc(var(--sab) + 14px) calc(var(--sal) + 14px)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;width:min(760px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.card header{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.card header h2{margin:0;font-family:var(--serif);font-weight:700;letter-spacing:.06em;color:var(--gold2);font-size:20px;flex:1}
+.x{appearance:none;border:1px solid var(--line);background:none;color:var(--ink);border-radius:10px;min-width:40px;min-height:40px;font-size:18px}
+.card .body{overflow-y:auto;padding:12px 16px 16px;-webkit-overflow-scrolling:touch}
+#q{width:100%;border:1px solid var(--line);background:rgba(0,0,0,.3);border-radius:10px;padding:10px 12px;outline:none;color:var(--ink);font-size:15px;margin-bottom:10px}
+#q:focus{border-color:var(--gold)}
+.bk{display:grid;grid-template-columns:14px 1fr auto;gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid rgba(232,176,75,.12)}
+.bk .sp{width:14px;height:58px;border-radius:2px;box-shadow:inset -3px 0 0 rgba(0,0,0,.35),inset 0 4px 0 rgba(226,189,104,.7),inset 0 -4px 0 rgba(226,189,104,.7)}
+.bk .sp:not(.gilt){box-shadow:inset -3px 0 0 rgba(0,0,0,.35),inset 0 9px 0 rgba(226,189,104,.35),inset 0 -9px 0 rgba(226,189,104,.35)}
+.ctabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px}
+.ctab{appearance:none;border:1px solid var(--line);background:none;color:var(--dim);border-radius:999px;padding:5px 11px;font:inherit;font-size:13px;cursor:pointer}
+.ctab small{opacity:.7;margin-left:3px}
+.ctab[aria-pressed="true"]{color:var(--gold);border-color:var(--gold);background:rgba(232,176,75,.12)}
+.csec{margin:18px 0 2px;font:700 13px/1.3 Georgia,serif;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.csec.gold{color:var(--gold)}
+.csec span{display:block;font:italic 400 12px/1.3 Georgia,serif;letter-spacing:0;text-transform:none;color:var(--dim)}
+.bk .ti{font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);line-height:1.2}
+.bk .au{font-size:13px;color:var(--gold);margin-top:2px}
+.bk .bl{font-size:13px;color:var(--dim);margin-top:4px;line-height:1.35}
+.bk .wh{font-size:12px;color:#8f7d60;margin-top:4px}
+.bk .pr{height:4px;border-radius:2px;background:rgba(255,255,255,.08);margin-top:6px;overflow:hidden;max-width:220px}
+.bk .pr i{display:block;height:100%;background:var(--gold)}
+.bk .bt{display:flex;flex-direction:column;gap:6px}
+.sbtn{appearance:none;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--gold2);border-radius:10px;padding:7px 12px;font-weight:700;font-size:13px;min-height:38px;white-space:nowrap}
+.sbtn:hover{border-color:var(--gold)}
+.sbtn.solid{background:var(--gold);color:#2a1606;border-color:var(--gold)}
+.muted{color:var(--dim);font-size:13px;line-height:1.5}
+.inv-link{display:flex;gap:8px;margin:10px 0}
+.inv-link input{flex:1;min-width:0;border:1px solid var(--line);background:rgba(0,0,0,.3);border-radius:10px;padding:10px;color:var(--gold2);font-weight:700}
+.people{margin:10px 0;padding:0;list-style:none}
+.people li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(232,176,75,.1);font-size:14px}
+.people li i{width:10px;height:10px;border-radius:50%;display:inline-block}
+#arrange{position:fixed;z-index:25;left:50%;transform:translateX(-50%);bottom:calc(var(--sab) + 96px);display:none;flex-wrap:wrap;gap:6px;justify-content:center;
+  width:min(780px,calc(100vw - 20px));padding:8px;background:rgba(13,10,7,.82);border:1px solid var(--line);border-radius:14px}
+body.arranging #arrange{display:flex}
+#arrange .h{width:100%;text-align:center;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+#arrange button{appearance:none;border:1px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);border-radius:10px;padding:7px 10px;font-size:13px;font-weight:700;min-height:38px}
+#arrange button:hover{border-color:var(--gold);color:var(--gold2)}
+@media (max-width:640px){ #arrange{bottom:calc(var(--sab) + 120px)} #arrange button{padding:6px 8px;font-size:12px} }
+
+/* ---------- reader ---------- */
+#reader{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:rgba(8,5,3,.86)}
+#reader.paper{--rb:#f3ead6;--ri:#2a2018;--rd:#7a6a52;--rl:rgba(120,90,50,.18);--rm:rgba(232,176,75,.35)}
+#reader.sepia{--rb:#e8d6b3;--ri:#3a2a18;--rd:#7a5f3e;--rl:rgba(110,80,40,.22);--rm:rgba(200,140,60,.35)}
+#reader.night{--rb:#1c1814;--ri:#e6dccb;--rd:#9a8a70;--rl:rgba(232,176,75,.14);--rm:rgba(232,176,75,.28)}
+.rtop{display:flex;align-items:center;gap:8px;padding:calc(var(--sat) + 8px) calc(var(--sar) + 12px) 8px calc(var(--sal) + 12px);color:var(--ink)}
+.rtop .ttl{flex:1;min-width:0;text-align:center}
+.rtop .ttl b{display:block;font-family:var(--serif);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--gold2)}
+.rtop .ttl span{display:block;font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rbtn{appearance:none;border:1px solid var(--line);background:rgba(13,10,7,.6);color:var(--gold2);border-radius:10px;min-width:40px;min-height:40px;padding:0 10px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.rbtn svg{width:18px;height:18px}
+.rbtn[aria-pressed="true"]{background:rgba(232,176,75,.22);border-color:var(--gold)}
+#rstage{position:relative;flex:1;min-height:0;display:flex;align-items:stretch;justify-content:center;padding:0 calc(var(--sar) + 8px) 0 calc(var(--sal) + 8px)}
+#rbook{position:relative;flex:1;max-width:1180px;background:var(--rb);color:var(--ri);border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.6),inset 0 0 60px rgba(120,80,30,.12);overflow:hidden}
+#rbook.spread:after{content:"";position:absolute;top:0;bottom:0;left:50%;width:40px;margin-left:-20px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(0,0,0,0),rgba(0,0,0,.10) 45%,rgba(0,0,0,.16) 50%,rgba(0,0,0,.10) 55%,rgba(0,0,0,0))}
+#rview{position:absolute;inset:0;overflow:hidden;contain:strict}
+#rcols{height:100%;column-fill:auto;contain:layout style;font-family:var(--serif);font-size:var(--fs,19px);line-height:1.62;hyphens:auto;-webkit-hyphens:auto;text-align:justify;
+  will-change:transform;transition:transform .32s cubic-bezier(.3,.7,.2,1)}
+#rcols.snap{transition:none}
+#rcols p{margin:0 0 .2em;text-indent:1.4em;orphans:2;widows:2;position:relative}
+#rcols p.first{text-indent:0}
+#rcols p.first::first-letter{float:left;font-size:3.1em;line-height:.9;padding:.06em .08em 0 0;color:var(--rd)}
+#rcols h2{font-weight:600;font-size:1.35em;text-align:center;margin:1.2em 0 .9em;letter-spacing:.02em;break-after:avoid;line-height:1.25}
+#rcols h3{font-weight:600;font-style:italic;font-size:1.02em;text-align:center;margin:1em 0 .6em;break-after:avoid;text-indent:0;color:var(--rd)}
+#rcols .v{white-space:pre-wrap;margin:.6em 0 .8em 1.4em;text-align:left;font-style:italic;break-inside:avoid}
+#rcols .fn{font-size:.82em;color:var(--rd);margin:.5em 0 .7em;padding-left:1em;border-left:2px solid var(--rl);text-indent:0}
+#rcols .end{text-align:center;color:var(--rd);margin:2em 0 1em;font-style:italic;text-indent:0;break-inside:avoid}
+#rcols .end .sbtn{margin:10px 6px 0;color:var(--ri);border-color:var(--rl)}
+#rcols p.annot::before{content:'\270E';position:absolute;left:-1.25em;top:.1em;color:#a8402c;font-size:.78em;text-indent:0}
+#reader.night #rcols p.annot::before{color:#f0a088}
+#rcols mark{background:var(--rm);color:inherit;border-radius:2px;padding:0 1px;cursor:pointer}
+#rcols .note{display:block;margin:.25em 0 .7em 1.2em;padding:.25em .6em;font-family:var(--hand);font-size:.86em;line-height:1.35;color:#8a2a1c;text-indent:0;
+  border-left:2px solid rgba(160,50,30,.5);transform:rotate(-.6deg);text-align:left;break-inside:avoid;cursor:pointer}
+#reader.night #rcols .note{color:#f0a088;border-color:rgba(240,160,136,.5)}
+#rcols .note small{display:block;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.7em;color:var(--rd);letter-spacing:.04em}
+#rcols p.speaking{background:var(--rl)}
+.rnav{position:absolute;top:0;bottom:0;width:14%;z-index:2;cursor:pointer;background:none;border:0;padding:0}
+.rnav.l{left:0} .rnav.r{right:0}
+.rnav:focus-visible{outline:2px solid var(--rm)}
+.rbot{display:flex;align-items:center;gap:10px;padding:8px calc(var(--sar) + 14px) calc(var(--sab) + 10px) calc(var(--sal) + 14px);color:var(--dim);font-size:12px}
+.rbot input[type=range]{flex:1;accent-color:var(--gold)}
+#rsel{position:fixed;z-index:65;display:none;transform:translate(-50%,-100%);background:#2a1d10;border:1px solid var(--gold);border-radius:10px;padding:4px;gap:4px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#rsel.on{display:flex}
+#rsel button{appearance:none;border:0;background:none;color:var(--gold2);font-weight:800;font-size:13px;padding:8px 10px;border-radius:8px;min-height:36px}
+#rsel button:hover{background:rgba(232,176,75,.15)}
+.rpanel{position:absolute;z-index:4;top:0;bottom:0;width:min(360px,92%);background:var(--panel);border:1px solid var(--line);overflow-y:auto;padding:12px 14px;color:var(--ink);-webkit-overflow-scrolling:touch}
+.rpanel.left{left:0;border-radius:0 12px 12px 0} .rpanel.right{right:0;border-radius:12px 0 0 12px}
+.rpanel h3{margin:4px 0 10px;font-family:var(--serif);color:var(--gold2);font-size:17px}
+.rpanel .ch{display:block;width:100%;text-align:left;appearance:none;background:none;border:0;border-bottom:1px solid rgba(232,176,75,.1);color:var(--ink);padding:9px 4px;font-size:14px;font-family:var(--serif)}
+.rpanel .ch.cur{color:var(--gold2);font-weight:700}
+.rpanel .ch small{color:var(--dim);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;margin-left:6px}
+.rpanel .nt{border-bottom:1px solid rgba(232,176,75,.1);padding:9px 2px;font-size:13px;cursor:pointer}
+.rpanel .nt q{display:block;font-family:var(--serif);font-style:italic;color:var(--dim);margin-bottom:4px}
+.rpanel .nt span{font-family:var(--hand);color:#f0a088;font-size:15px}
+.rpanel .nt small{display:block;color:#8f7d60;margin-top:3px}
+.rpanel .set{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid rgba(232,176,75,.1);font-size:14px}
+#noted{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;background:rgba(5,3,2,.5);padding:16px}
+#noted .card{width:min(460px,100%)}
+#noted q{display:block;font-family:var(--serif);font-style:italic;color:var(--dim);margin-bottom:10px;max-height:6.5em;overflow:hidden}
+#noted textarea{width:100%;min-height:110px;resize:vertical;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:#8a2a1c;font-family:var(--hand);font-size:18px;padding:10px;outline:none}
+#noted .row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;align-items:center}
+#noted label{margin-right:auto;font-size:13px;color:var(--dim);display:flex;gap:6px;align-items:center}
+#nogl{max-width:520px;text-align:center;color:var(--dim);margin-top:16px;line-height:1.5}
+</style>
+</head>
+<body>
+<canvas id="gl" tabindex="0" aria-label="The reading room, a 3D library"></canvas>
+<a id="home" class="chip" href="./" data-arcade-home="1" aria-label="Back to the Arcade">
+  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10l7-6 7 6M5 8.5V16h4v-4h2v4h4V8.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="lbl">Arcade</span>
+</a>
+<div id="tools">
+  <button class="chip" id="bCat" type="button" title="Card catalog (C)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h4v12H3zM8 4h3v12H8zM12.5 4.6l3-.8 3 11.6-3 .8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="lbl">Catalog</span></button>
+  <button class="chip" id="bArr" type="button" aria-pressed="false" title="Rearrange the room (Tab)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 11h12v3H4zM5 14v3M15 14v3M6 11V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="lbl">Arrange</span></button>
+  <button class="chip" id="bInv" type="button" title="Invite friends to read with you"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 17c0-3 2.5-5 5-5s5 2 5 5M14 6v6M11 9h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="lbl" id="bInvL">Invite</span></button>
+  <button class="chip" id="bView" type="button" aria-pressed="false" title="First or third person (V)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="10" r="2.4" fill="currentColor"/></svg><span class="lbl">View</span></button>
+  <button class="chip" id="bZoom" type="button" aria-pressed="false" title="Zoom in on the shelves (wheel, pinch, + / −, Z)"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.2 12.2L17 17M6.3 8.5h4.4M8.5 6.3v4.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="lbl" id="bZoomL">Zoom</span></button>
+  <button class="chip" id="bSnd" type="button" aria-pressed="false" title="Sound"><svg viewBox="0 0 20 20" aria-hidden="true"><path id="sndIcon" d="M3 8h3l4-3v10l-4-3H3z M13 7a4 4 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></button>
+  <button class="chip" id="bHelp" type="button" title="Controls">?</button>
+</div>
+
+<div id="cross"></div>
+<div id="tags"></div>
+<div id="stick"><i></i></div>
+<div id="arrBanner" hidden>Arranging the room</div>
+<div id="arrange" aria-label="Add furniture">
+  <div class="h">Add to the room — then click to set it down</div>
+</div>
+<div id="bar">
+  <div id="hand"><span class="sw" id="handSw"></span><span>Carrying <b id="handT"></b></span></div>
+  <div id="prompt"></div>
+  <div id="acts"></div>
+</div>
+<div id="chat"><div id="chatlog" aria-live="polite"></div><input id="chatin" maxlength="160" placeholder="Say something… (Enter)" autocomplete="off"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<section id="title">
+  <div class="logo"><div class="t">THE READING ROOM</div><div class="s">The slave narratives, the radical tradition and Black history the world over on a golden wall; scripture by the fire; the great books in a domed hall. All free to read. Walk in, begin at the lit shelves, sit by the fire.</div></div>
+  <div class="epi">“From that moment, I understood the pathway from slavery to freedom.”<b>FREDERICK DOUGLASS, <i>NARRATIVE</i>, 1845, CHAPTER VI</b></div>
+  <div class="invite-note" id="invNote" hidden></div>
+  <div class="pick-h">Who walks in?</div>
+  <div id="who" role="group" aria-label="Choose who you read as"></div>
+  <div class="row2">
+    <div class="field"><label for="nm">Name</label><input id="nm" maxlength="14" autocomplete="off" spellcheck="false"></div>
+    <button class="big" id="go" type="button">Enter the library</button>
+  </div>
+  <button class="link" id="justRead" type="button">Just read — open the catalog</button>
+  <div id="loadmsg"></div>
+  <div class="keys">
+    <span class="kb"><b>WASD</b> walk · <b>drag</b> to look · <b>click</b> a book to take it · <b>click</b> a chair to sit and read · <b>Tab</b> rearrange · <b>C</b> catalog · <b>V</b> view</span>
+    <span class="tp">Left thumb walks · drag to look · <b>tap</b> a book to take it, a chair to sit and read · <b>tap the floor</b> to walk there</span>
+  </div>
+  <div id="nogl" hidden>This device can't draw the 3D room, but every book is still here: open the catalog to read.</div>
+</section>
+
+<div class="sheet" id="catalog" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="catH">
+    <header><h2 id="catH">The Card Catalog</h2><button class="x" type="button" data-close aria-label="Close">✕</button></header>
+    <div class="body">
+      <input id="q" type="search" placeholder="Search titles and authors" autocomplete="off">
+      <div id="catTabs" class="ctabs"></div>
+      <div id="catList"></div>
+      <p class="muted" id="catFoot"></p>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="invite" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="invH">
+    <header><h2 id="invH">Read together</h2><button class="x" type="button" data-close aria-label="Close">✕</button></header>
+    <div class="body" id="invBody"></div>
+  </div>
+</div>
+
+<div class="sheet" id="help" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="helpH">
+    <header><h2 id="helpH">How the room works</h2><button class="x" type="button" data-close aria-label="Close">✕</button></header>
+    <div class="body muted">
+      <p><b style="color:var(--gold2)">Walk</b> with WASD or the arrow keys (Shift to hurry), or your left thumb on a phone. <b style="color:var(--gold2)">Look</b> by dragging. Click or tap the floor to walk there.</p>
+      <p><b style="color:var(--gold2)">Look closer.</b> Scroll the wheel, pinch the trackpad or the screen, or press <b>+</b> / <b>−</b> to zoom in on the shelves and read the spines; <b>Z</b> or the magnifier steps through 1×, 2.5× and 6×, and Esc zooms back out. Zoomed in, the title of the book you aim at shows at the bottom of the screen.</p>
+      <p><b style="color:var(--gold2)">Books.</b> The east wall is the golden wall: gilt shelves backed in oxblood, under brass lights. The narratives stand at its heart, with the WPA interviews above them, lit, and a gilt runner leading to them: begin there; to one side are Africa and the diaspora and the radical tradition, to the other the speeches and essays and the historians. The fiction, the poets and the witnesses stand in gilt beside the fire, with scripture and the spirit; useful knowledge and natural history are on the south wall; the great books of the world, in leather with dark title labels, fill the Great Hall. The books of the person you read as glow for you. The plain old volumes are the room's own. Click a book to take it down; you carry one at a time. Click an open shelf to put it there, or a table to start a pile. Piles stay where you leave them.</p>
+      <p><b style="color:var(--gold2)">The Great Hall.</b> The double doors on the south wall, across from the fire, open when you finish your first chapter. Behind them is a domed hall with a card catalog at its centre, and shelves for the library to grow into. Off its east side, the Banned Books gallery opens when you finish your first whole book (some are short). In a friend's room, the doors follow the host's reading.</p>
+      <p><b style="color:var(--gold2)">Read.</b> Sit in any chair, sofa, stool or window seat while holding a book and it opens. Or press <b>R</b> to read standing up. Your place in every book is kept. The speaker button in the reader reads the book aloud to you.</p>
+      <p><b style="color:var(--gold2)">Notes in the margin.</b> In the reader, select a few words (or tap a paragraph) and choose <i>Note</i>. Your notes stay with the book; in a shared room, friends see them too.</p>
+      <p><b style="color:var(--gold2)">Rearrange.</b> Press Tab (or <i>Arrange</i>) to move furniture, turn it with Q and E, add new pieces or put them away. Bookcases you add come with empty shelves for your own sections.</p>
+      <p><b style="color:var(--gold2)">Read together.</b> <i>Invite</i> makes a link. Friends who open it walk into your room as their reader, see what you're reading and can talk in the room. On the shared claude.ai page there is no link to send: everyone who opens the page walks into one shared library (up to six at a time is comfortable), and books and furniture stay where you all leave them.</p>
+      <p>The texts are U.S. public domain, from the Project Gutenberg editions; see <a href="SOURCES.md" style="color:var(--gold)">SOURCES.md</a>.</p>
+    </div>
+  </div>
+</div>
+
+<section id="reader" class="paper" hidden aria-label="Reader">
+  <div class="rtop">
+    <button class="rbtn" id="rClose" type="button" aria-label="Close the book" title="Close (Esc)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <button class="rbtn" id="rToc" type="button" aria-pressed="false" title="Chapters"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <div class="ttl"><b id="rTitle"></b><span id="rCh"></span></div>
+    <button class="rbtn" id="rSpeak" type="button" aria-pressed="false" title="Read aloud"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3z M13 7a4 4 0 0 1 0 6 M15 5a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></button>
+    <button class="rbtn" id="rNotes" type="button" aria-pressed="false" title="Notes"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3h9l3 3v11H4z M7 8h6M7 11h6M7 14h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></button>
+    <button class="rbtn" id="rSet" type="button" aria-pressed="false" title="Type and paper">Aa</button>
+  </div>
+  <div id="rstage">
+    <div id="rbook">
+      <div id="rview"><div id="rcols"></div></div>
+      <button class="rnav l" id="rPrev" type="button" aria-label="Previous page"></button>
+      <button class="rnav r" id="rNext" type="button" aria-label="Next page"></button>
+      <div class="rpanel left" id="pToc" hidden><h3>Chapters</h3><div id="tocList"></div></div>
+      <div class="rpanel right" id="pNotes" hidden><h3>Notes in this book</h3><div id="noteList"></div></div>
+      <div class="rpanel right" id="pSet" hidden><h3>Type and paper</h3>
+        <div class="set"><span>Size</span><span><button class="sbtn" id="fsDn" type="button">A−</button> <button class="sbtn" id="fsUp" type="button">A+</button></span></div>
+        <div class="set"><span>Paper</span><span><button class="sbtn" data-th="paper" type="button">Cream</button> <button class="sbtn" data-th="sepia" type="button">Sepia</button> <button class="sbtn" data-th="night" type="button">Night</button></span></div>
+        <div class="set"><span>Two pages side by side</span><button class="sbtn" id="spreadT" type="button">On</button></div>
+        <div class="set"><span>Friends' notes</span><button class="sbtn" id="othersT" type="button">Shown</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="rbot"><span id="rPg"></span><input type="range" id="rSeek" min="0" max="100" value="0" aria-label="Position in chapter"><span id="rPct"></span></div>
+</section>
+<div id="rsel"><button type="button" id="rsNote">✎ Note</button><button type="button" id="rsCopy">Copy</button></div>
+<div id="noted" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="ndH">
+    <header><h2 id="ndH">A note in the margin</h2><button class="x" type="button" id="ndX" aria-label="Cancel">✕</button></header>
+    <div class="body"><q id="ndQ"></q><textarea id="ndT" maxlength="1200" placeholder="What does this make you think?"></textarea>
+      <div class="row"><label id="ndShareL"><input type="checkbox" id="ndShare" checked> Share with the room</label><button class="sbtn" type="button" id="ndDel" hidden>Erase</button><button class="sbtn solid" type="button" id="ndOk">Keep note</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="lib/three.min.js"></script>
+<script src="world.js"></script>
+<script src="avatars.js"></script>
+<script src="reader.js"></script>
+<script src="commons-config.js"></script>
+<script src="vendor/nostr-tools.bundle.js"></script>
+<script src="commons-nostr.js"></script>
+<script src="net.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
