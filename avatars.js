@@ -5,12 +5,12 @@
    blink and drop toward the page, a painted face (brows, the colour of the lips, lines of age) and hair that
    is the person's own. Each is carried by what people know from photographs and engravings, or from words:
      Frederick Douglass: the swept-back white mane and full beard of his later portraits, frock coat, bow tie.
-     Phillis Wheatley: the 1773 frontispiece of her Poems: white mob cap with its frill, dark gown, white collar,
+     Phillis Wheatley, as in the 1773 frontispiece of her Poems: white mob cap with its frill, dark gown, white collar,
        ruffled elbow sleeves. Young and slight.
-     Harriet Bailey, Douglass's mother: no likeness survives, so his words in My Bondage and My Freedom: "tall,
+     Harriet Bailey, Douglass's mother: no likeness survives, so from his words in My Bondage and My Freedom, "tall,
        and finely proportioned; of deep black, glossy complexion; had regular features", "remarkably sedate in
        her manners" (she looks about less). A Maryland field hand of the 1820s: tow linen, apron, checked headwrap.
-     Harriet Jacobs: her 1894 photograph: grey hair parted in the middle and drawn back to a knot, a dark
+     Harriet Jacobs, as in her 1894 photograph: grey hair parted in the middle and drawn back to a knot, a dark
        high-collared dress and brooch.
      Ida B. Wells: upswept hair with a curled fringe, high collar, brooch, puffed sleeves, gold earrings.
      Booker T. Washington: close crop parted on the left, clean-shaven, dark three-piece suit, high stiff collar.
@@ -31,8 +31,9 @@
      read-aloud button works for anyone).
    ALIAS: readers who used to be here: a saved or remote 'tubman' builds as Wheatley, 'truth' as Bailey.
      resolve(id) -> an id in LIST.
-   Cost: 26 to 38 meshes a figure; materials, textures and the static geometry are shared between figures of
-   the same reader; only the skirt or coat skirts and the turning leaf are reshaped, and only when they move. */
+   Cost: 28 to 40 meshes and about 26 to 32 thousand triangles a figure (four of the meshes are the open book,
+   drawn only while reading); materials, textures and the static geometry are built once per reader and shared
+   by every figure of them; only the skirt or coat skirts and the turning leaf are reshaped, and only as they move. */
 'use strict';
 const RR_AVATARS = (() => {
   if (!window.THREE) return null;
@@ -192,7 +193,7 @@ const RR_AVATARS = (() => {
 
   const matCache = new Map();
   function mat(hex, rough, metal, extra) {
-    const k = hex + ':' + rough + ':' + (metal || 0) + ':' + (extra ? JSON.stringify(extra, (key, v) => (v && v.isTexture ? v.uuid : v)) : '');
+    const k = hex + ':' + rough + ':' + (metal || 0) + ':' + (extra ? Object.keys(extra).map(n => n + '=' + (extra[n] && extra[n].isTexture ? extra[n].uuid : extra[n])).join(',') : '');
     if (!matCache.has(k)) {
       const o = Object.assign({ color: hex, roughness: rough == null ? 0.7 : rough, metalness: metal || 0 }, extra || {});
       if (o.weave) { o.bumpMap = weaveTile(); o.bumpScale = o.weave; }            // cloth: the threads catch the light up close
@@ -420,7 +421,7 @@ const RR_AVATARS = (() => {
       items.push(one(new T.SphereGeometry(1, 10, 7), M4(0, -0.004, 0, 0.02, 0.028, 0.027)));                   // the wrist
       items.push(one(new T.SphereGeometry(1, 14, 9), M4(-s * 0.001, -0.052, 0.002, 0.0155, 0.047, 0.041)));   // the palm
       items.push(one(new T.SphereGeometry(1, 9, 6), M4(-s * 0.006, -0.03, 0.026, 0.013, 0.024, 0.016, 0.4)));  // the ball of the thumb
-      const F = [[0.029, 0.0088, 0.044, 0.034], [0.0095, 0.0092, 0.049, 0.037], [-0.0105, 0.0088, 0.046, 0.034], [-0.029, 0.0076, 0.036, 0.028]];
+      const F = [[0.0265, 0.0089, 0.044, 0.034], [0.0088, 0.0093, 0.049, 0.037], [-0.0092, 0.0089, 0.046, 0.034], [-0.026, 0.0078, 0.036, 0.028]];
       F.forEach(([z, r, l1, l2], i) => {
         const c1 = curl * (0.85 + i * 0.08), c2 = curl * 1.15 + 0.1;
         const g1 = -s * c1, g2 = -s * (c1 + c2);
@@ -747,7 +748,7 @@ const RR_AVATARS = (() => {
       } else {
         const tm = mat(L.tie, 0.5);
         add('neck', tm, new T.CylinderGeometry(0.011, 0.007, 0.024, 10), M4(0, ch * 0.32, 0.066, 1, 1, 0.7, -0.15));
-        [-1, 1].forEach(s => add('neck', shirt2, new T.BoxGeometry(1, 1, 1), M4(s * 0.022, ch * 0.45, 0.063, 0.03, ch * 0.75, 0.003, -0.25, s * 0.3, s * (L.tieStyle === 'narrow' ? 0.9 : 0.55))));
+        [-1, 1].forEach(s => add('neck', shirt2, new T.SphereGeometry(1, 12, 8), M4(s * 0.019, ch * 0.42, 0.064, 0.016, ch * 0.4, 0.0028, -0.2, s * 0.35, s * (L.tieStyle === 'narrow' ? 0.85 : 0.5))));   // the collar's points
       }
     } else if (L.collar === 'high') {
       const dm = mat(L.dress, 0.75, 0, WV);

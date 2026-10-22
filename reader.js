@@ -38,7 +38,7 @@ const RR_READER = (() => {
   function saveSet() { store.save('readset', set, true); }
 
   /* ---------------- open / close ---------------- */
-  // listen: the reader never learned to read (Truth, Tubman), so the book starts reading itself aloud
+  // listen: for a reader marked `listens` in avatars.js the book starts reading itself aloud
   async function open(meta, opts) {
     const el = $('#reader');
     el.hidden = false;
