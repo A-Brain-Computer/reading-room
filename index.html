@@ -69,7 +69,7 @@ body:not(.playing) #tools,body.reading #tools,body.reading #home,body.reading #b
 .who.locked .n{color:var(--dim)}
 .who.locked .y{color:var(--gold2)}
 .who{position:relative;border:1px solid var(--line);border-radius:14px;background:rgba(26,18,10,.85);padding:0 0 8px;overflow:hidden;text-align:center;min-height:44px}
-.who img,.who .ph{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:radial-gradient(circle at 50% 35%,#4a3018,#1a120a 75%)}
+.who img,.who .ph{display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;background:radial-gradient(circle at 50% 35%,#4a3018,#1a120a 75%)}
 .who .n{display:block;font-weight:800;font-size:13px;margin-top:6px;color:var(--ink);line-height:1.15;padding:0 4px}
 .who .y{display:block;font-size:11px;color:var(--dim);margin-top:2px}
 .who[aria-pressed="true"]{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset,0 6px 20px rgba(232,176,75,.2)}
@@ -280,7 +280,18 @@ body.arranging #arrange{display:flex}
   <div class="epi">“From that moment, I understood the pathway from slavery to freedom.”<b>FREDERICK DOUGLASS, <i>NARRATIVE</i>, 1845, CHAPTER VI</b></div>
   <div class="invite-note" id="invNote" hidden></div>
   <div class="pick-h">Who walks in?</div>
-  <div id="who" role="group" aria-label="Choose who you read as"></div>
+  <!-- the readers, in the page itself so their faces show before any script runs (main.js buildWho gives them their state;
+       the pictures are drawn by tools/library-portraits.js) -->
+  <div id="who" role="group" aria-label="Choose who you read as">
+    <button type="button" class="who" data-id="douglass" aria-pressed="true" title="Learned to read in Baltimore against his enslaver&#x27;s orders; wrote three autobiographies."><img alt="" src="portraits/douglass.webp"><span class="n">Frederick Douglass</span><span class="y">1818–1895</span></button>
+    <button type="button" class="who" data-id="wheatley" aria-pressed="false" title="Brought to Boston from West Africa as a child, she could read the Bible within sixteen months; published Poems on Various Subjects in 1773."><img alt="" src="portraits/wheatley.webp"><span class="n">Phillis Wheatley</span><span class="y">c. 1753–1784</span></button>
+    <button type="button" class="who" data-id="bailey" aria-pressed="false" title="Frederick Douglass&#x27;s mother, a Maryland field hand who walked twelve miles at night to see him; he learned after her death that she could read."><img alt="" src="portraits/bailey.webp"><span class="n">Harriet Bailey</span><span class="y">c. 1792–1825</span></button>
+    <button type="button" class="who" data-id="jacobs" aria-pressed="false" title="Taught to read as a girl; hid nearly seven years in a crawlspace in her grandmother&#x27;s house, then wrote Incidents in the Life of a Slave Girl."><img alt="" src="portraits/jacobs.webp"><span class="n">Harriet Jacobs</span><span class="y">c. 1813–1897</span></button>
+    <button type="button" class="who" data-id="wells" aria-pressed="false" title="Born enslaved in Mississippi; journalist who documented lynching."><img alt="" src="portraits/wells.webp"><span class="n">Ida B. Wells</span><span class="y">1862–1931</span></button>
+    <button type="button" class="who" data-id="washington" aria-pressed="false" title="Born enslaved in Virginia; learned to read while working in salt furnaces and a coal mine, walked much of the way to Hampton, and founded Tuskegee."><img alt="" src="portraits/washington.webp"><span class="n">Booker T. Washington</span><span class="y">1856–1915</span></button>
+    <button type="button" class="who" data-id="dubois" aria-pressed="false" title="Historian and sociologist; wrote The Souls of Black Folk."><img alt="" src="portraits/dubois.webp"><span class="n">W. E. B. Du Bois</span><span class="y">1868–1963</span></button>
+    <button type="button" class="who locked" data-id="malcolm" aria-pressed="false"><img alt="" src="portraits/malcolm.webp"><span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">0/10 books · 0/1 read</span></button>
+  </div>
   <div class="row2">
     <div class="field"><label for="nm">Name</label><input id="nm" maxlength="14" autocomplete="off" spellcheck="false"></div>
     <button class="big" id="go" type="button">Enter the library</button>

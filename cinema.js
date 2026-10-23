@@ -513,7 +513,8 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   let fullVid = false;                                  // the film's own <video> fills the screen (from the 3D screen)
   let sysFull = false;                                  // ... in an iPhone's own player
   let texAt = -1, blindBrowser = false;                 // the frame last handed to the 3D screen; this browser can't paint films there
-  let probeC = null, probeAt = 0, probeT = -1, blank = 0;
+  let probeC = null, probeAt = 0, probeT = -1, blank = 0, dark = 0, darkSig = '';
+  let relayC = null, relayG = null;                     // the canvas each frame is drawn into for the 3D screen
   const now = () => performance.now();
   const shared = () => !!(ctx && ctx.shared && ctx.shared());
   const isHost = () => !ctx || !ctx.host || ctx.host();
@@ -581,7 +582,8 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
     video.addEventListener('loadedmetadata', mineEv(onMeta));
     video.addEventListener('error', mineEv(onErr));
     video.addEventListener('playing', mineEv(() => { F.frame = true; paint(); }));
-    video.addEventListener('seeked', mineEv(() => { F.frame = true; if (vtex) vtex.needsUpdate = true; wake(); }));
+    video.addEventListener('seeked', mineEv(() => { F.frame = true; relayFrame(); wake(); }));
+    video.addEventListener('resize', mineEv(() => { if (F.mode === 'tex' && relayC && (relayC.width < 3 || Math.abs(relayC.width / relayC.height - video.videoWidth / Math.max(1, video.videoHeight)) > 0.01)) { makeRelay(); relayFrame(); paint(); } }));
     video.addEventListener('waiting', mineEv(() => paint()));
     video.addEventListener('ended', mineEv(onEnded));
     // in the window or full screen, the player's own buttons work for the whole room; its sound is yours alone
@@ -609,9 +611,8 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   function onMeta() {
     F.dur = isFinite(video.duration) ? video.duration : 0;
     if (F.cors && !blindBrowser) {
-      F.mode = 'tex'; texAt = -1; probeT = -1; blank = 0;
-      if (vtex) vtex.dispose();
-      vtex = new T.VideoTexture(video); vtex.colorSpace = T.SRGBColorSpace;
+      F.mode = 'tex'; probeT = -1; blank = 0; dark = 0; darkSig = '';
+      makeRelay();
     } else {
       F.mode = 'dom';                                    // the server won't share its pixels, or this browser can't paint them: a window
       if (!fullVid) {
@@ -636,6 +637,22 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
     if (video && !video.paused) { ours = now(); video.pause(); }
     if (isHost() && cur && cur.playing) setScreen({ playing: false, pos: 0 });
     paint();
+  }
+  /* --- the 3D screen shows each frame copied through a canvas. Safari (iPhone, iPad and Mac) plays these films and
+         draws them onto a canvas, but its direct video-to-WebGL path can leave the screen black. --- */
+  function makeRelay() {
+    const vw = video.videoWidth || 640, vh = video.videoHeight || 480, k = Math.min(1, 1024 / Math.max(vw, vh));
+    relayC = relayC || document.createElement('canvas');
+    relayC.width = Math.max(2, Math.round(vw * k)); relayC.height = Math.max(2, Math.round(vh * k));
+    relayG = relayC.getContext('2d', { alpha: false });
+    relayG.fillStyle = '#000'; relayG.fillRect(0, 0, relayC.width, relayC.height);
+    if (vtex) vtex.dispose();
+    vtex = new T.CanvasTexture(relayC); vtex.colorSpace = T.SRGBColorSpace; vtex.minFilter = T.LinearFilter; vtex.generateMipmaps = false;
+    texAt = -1;
+  }
+  function relayFrame() {
+    if (!vtex || !relayG || !video || video.readyState < 2) return;
+    try { relayG.drawImage(video, 0, 0, relayC.width, relayC.height); vtex.needsUpdate = true; texAt = video.currentTime; } catch (e) {}
   }
   function seekVideo(t) { if (!video || !isFinite(t)) return; ours = now(); try { video.currentTime = Math.max(0, F.dur ? Math.min(t, F.dur - 0.05) : t); } catch (e) {} }
   function playVideo() {
@@ -727,7 +744,13 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
       const d = g.getImageData(0, 0, 8, 8).data; ok = false;
       for (let i = 3; i < d.length; i += 4) if (d[i]) { ok = true; break; }   // even a black frame comes through opaque
     } catch (e) { ok = e && e.name === 'SecurityError' ? false : null; }
-    if (ok) { F.seen = true; blank = 0; }
+    if (ok) {
+      blank = 0;
+      const d = probeC.getContext('2d').getImageData(0, 0, 8, 8).data; let mx = 0, sig = '';
+      for (let i = 0; i < d.length; i += 4) { mx = Math.max(mx, d[i], d[i + 1], d[i + 2]); sig += d[i] + ','; }
+      if (mx >= 6 || (dark && sig !== darkSig)) { F.seen = true; dark = 0; return; }   // real pictures (even film grain in the dark moves)
+      darkSig = sig; if (++dark >= 6) blind();                                         // a browser handing over only black (~9 s)
+    }
     else if (ok === false && ++blank >= 2) blind();
   }
   function blind() {
@@ -1052,9 +1075,9 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
       const d = Math.hypot(cam.x, cam.y - PIC_Y, cam.z - SCR.z);
       const v = vol / (1 + Math.max(0, d - 6) * 0.15);
       if (Math.abs(video.volume - v) > 0.01) { sysAt = now(); video.volume = Math.max(0, Math.min(1, v)); }
-      // hand the screen each new frame: three.js waits for requestVideoFrameCallback, which browsers may never call
-      // for a video they think nobody sees (ours is hidden; the 3D screen shows it)
-      if (vtex && video.readyState >= 2 && video.currentTime !== texAt) { texAt = video.currentTime; vtex.needsUpdate = true; }
+      // copy each new frame to the screen ourselves (no waiting on requestVideoFrameCallback, which browsers may
+      // never call for a video they think nobody sees: ours is hidden, the 3D screen shows it)
+      if (video.currentTime !== texAt) relayFrame();
     }
     if (A.lamp > 0.003) O.beamMat.uniforms.uT.value += dt;
     drive(false);
@@ -1130,7 +1153,7 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   }
   // for tests: run the animations to their ends now
   function settle(n) { for (let i = 0; i < (n || 160); i++) step(0.05); pose(); return { k: A.k, lift: A.lift, lid: A.lid, lamp: A.lamp }; }
-  function state() { return { beam: O.beam && { on: O.beam.visible, verts: O.beam.geometry.attributes.position ? O.beam.geometry.attributes.position.count : 0, uO: O.beamMat.uniforms.uO.value }, cur, mode: F && F.mode, kind: F && F.kind, frame: F && F.frame, dur: F && F.dur, watching, viewOpen, url: F && F.url, time: localTime(), k: A.k, lift: A.lift, lamp: A.lamp, dim: A.dim, exposure: ctx && ctx.renderer.toneMappingExposure, video: !!video, paused: video ? video.paused : null, muted: effMuted(), elMuted: video ? video.muted : null, full: fullVid, blind: !!(F && F.blind), texAt }; }
+  function state() { return { beam: O.beam && { on: O.beam.visible, verts: O.beam.geometry.attributes.position ? O.beam.geometry.attributes.position.count : 0, uO: O.beamMat.uniforms.uO.value }, cur, mode: F && F.mode, kind: F && F.kind, frame: F && F.frame, dur: F && F.dur, watching, viewOpen, url: F && F.url, time: localTime(), k: A.k, lift: A.lift, lamp: A.lamp, dim: A.dim, exposure: ctx && ctx.renderer.toneMappingExposure, video: !!video, paused: video ? video.paused : null, muted: effMuted(), elMuted: video ? video.muted : null, full: fullVid, blind: !!(F && F.blind), texAt, relay: relayC ? relayC.width + 'x' + relayC.height : null }; }
 
   const hasFilm = () => !!(cur && cur.src);
   return { FILMS, init, sanitize, applyOp, sync, acts, label, open, settle, state, ytId, pickables, fullscreen, toggleMute, hasFilm };

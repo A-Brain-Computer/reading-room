@@ -1406,27 +1406,37 @@
 
   /* ---------------- title screen ---------------- */
   function buildWho() {
-    const box = $('#who'); box.innerHTML = '';
+    const box = $('#who');
     if (S.me.avatar === 'malcolm' && !malcolmOpen()) S.me.avatar = 'douglass';
     if (!AV.LIST.some(p => p.id === S.me.avatar)) S.me.avatar = AV.LIST[0].id;
+    // the tiles are in index.html, so the faces show before any script runs; here each gets its state, in AV.LIST's order
+    const have = new Map([...box.querySelectorAll('.who[data-id]')].map(b => [b.dataset.id, b]));
+    have.forEach((b, id) => { if (!AV.LIST.some(p => p.id === id)) b.remove(); });
+    const pr = malcolmProgress();
     AV.LIST.forEach(p => {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'who';
-      const locked = p.id === 'malcolm' && !malcolmOpen(), pr = malcolmProgress();
-      b.setAttribute('aria-pressed', S.me.avatar === p.id ? 'true' : 'false');
+      let b = have.get(p.id);
+      if (!b) { b = document.createElement('button'); b.type = 'button'; b.className = 'who'; b.dataset.id = p.id; b.innerHTML = `<img alt="" src="portraits/${p.id}.webp"><span class="n"></span><span class="y"></span>`; }
+      box.appendChild(b);
       // a hidden reader until you meet them: a dark figure, no name, and how far you are from meeting them
+      const locked = p.id === 'malcolm' && !malcolmOpen();
+      b.classList.toggle('locked', locked);
+      b.setAttribute('aria-pressed', S.me.avatar === p.id ? 'true' : 'false');
       b.title = locked ? `Someone is waiting to be met. Take down ten books (${Math.min(pr.taken, 10)} so far) and read one to the end (${Math.min(pr.done, 1)} of 1).` : p.line;
-      if (locked) b.classList.add('locked');
-      const img = `<img alt="" src="portraits/${p.id}.webp" width="300" height="400" decoding="async" data-id="${p.id}">`;
-      b.innerHTML = locked ? `${img}<span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">${Math.min(pr.taken, 10)}/10 books · ${Math.min(pr.done, 1)}/1 read</span>`
-        : `${img}<span class="n">${esc(p.name)}</span><span class="y">${esc(p.years)}</span>`;
+      let q = b.querySelector('.q');
+      if (locked && !q) { q = document.createElement('span'); q.className = 'q'; q.setAttribute('aria-hidden', 'true'); q.textContent = '?'; b.querySelector('img').after(q); }
+      if (!locked && q) q.remove();
+      b.querySelector('.n').textContent = locked ? 'Hidden' : p.name;
+      b.querySelector('.y').textContent = locked ? `${Math.min(pr.taken, 10)}/10 books · ${Math.min(pr.done, 1)}/1 read` : p.years;
       b.onclick = () => {
-        if (locked) { toast('Someone is waiting to be met. Take down ten books and read one of them to the end.', 4200); return; }
+        if (b.classList.contains('locked')) { toast('Someone is waiting to be met. Take down ten books and read one of them to the end.', 4200); return; }
         S.me.avatar = p.id; box.querySelectorAll('.who').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true');
       };
-      box.appendChild(b);
+      // a missing picture is drawn here instead, after the page is up
+      const im = b.querySelector('img');
+      const redraw = () => { if (S.gl) setTimeout(() => { try { im.src = AV.portrait(renderer, p.id); } catch (e) {} }, 50); };
+      if (im.complete && im.naturalWidth === 0 && im.getAttribute('src')) redraw();
+      else im.onerror = () => { im.onerror = null; redraw(); };
     });
-    // a missing picture is drawn here instead, one at a time, after the page is up
-    box.querySelectorAll('img[data-id]').forEach(im => { im.onerror = () => { im.onerror = null; if (S.gl) setTimeout(() => { try { im.src = AV.portrait(renderer, im.dataset.id); } catch (e) {} }, 50); }; });
   }
   function enter() {
     const nm = $('#nm').value.trim().slice(0, 14) || defaultName();
