@@ -16,12 +16,15 @@
    Nothing is made for the video until a film is chosen: the <video> element, its texture and the
    YouTube frame are built on first use, and the per-frame loop runs only while something moves or plays.
 
-   Some things belong to each viewer alone: the volume, muting (M), and watching full screen (G). Full
-   screen shows the <video> itself, so it also works where a browser can't paint the film onto the 3D
-   screen; where it can't, the film moves into the window by itself.
+   Some things belong to each viewer alone: the volume, muting (M), and watching full screen (G).
+
+   How the picture reaches the 3D screen depends on the browser. Where it can, each frame is copied
+   through a canvas into the screen's texture. Safari (iPhone, iPad, Mac) plays these films but hands
+   only black to a canvas, and a film whose server sends no CORS headers can't be copied at all: then
+   the <video> itself sits over the canvas, warped in perspective onto the screen every frame.
 
    API (main.js): init(ctx), sanitize(screen), applyOp(room, op), sync(room), acts(t), label(t), open(),
-   fullscreen(), toggleMute(), hasFilm() */
+   fullscreen(), toggleMute(), hasFilm(), afterRender() */
 'use strict';
 const RR_CINEMA = (() => {
   if (!window.THREE) return null;
@@ -162,6 +165,9 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
 #cineHud small{color:var(--dim);font-weight:600;font:600 11px ui-monospace,Menlo,monospace}
 #cineHold{position:fixed;width:2px;height:2px;right:0;bottom:0;overflow:hidden;opacity:.01;pointer-events:none;z-index:-1}
 #cineFull{position:fixed;width:2px;height:2px;right:0;bottom:0;overflow:hidden;z-index:-1}
+#cineOver{position:fixed;left:0;top:0;width:0;height:0;overflow:visible;z-index:1;pointer-events:none}
+#cineOver video{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;background:#000;object-fit:fill;max-width:none}
+body:not(.playing) #cineOver,body.reading #cineOver{display:none}
 #cineFull video{width:100%;height:100%;object-fit:contain;background:#000}
 #cineHud .chip.ic{padding:6px 9px;min-width:40px;justify-content:center}
 .cine-frame header .cx{display:inline-flex;align-items:center;justify-content:center}
@@ -213,7 +219,8 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   <button class="chip ic" type="button" id="chFull" aria-label="Full screen" title="Full screen (G)">${ICO.full}</button>
 </div>
 <div id="cineHold"></div>
-<div id="cineFull"></div>`;
+<div id="cineFull"></div>
+<div id="cineOver" aria-hidden="true"></div>`;
   while (wrap.firstElementChild) document.body.appendChild(wrap.firstElementChild);
   const fmt = (t) => {
     if (!isFinite(t) || t < 0) t = 0;
@@ -328,6 +335,7 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
     const key = kind + '|' + (s ? s.title : '') + '|' + (extra || '');
     if (key === cardKey) return; cardKey = key;
     const g = cardC.getContext('2d'), W2 = 1024, H = 768, F = 'Georgia, "Times New Roman", serif';
+    if (kind === 'blank') { g.fillStyle = '#000'; g.fillRect(0, 0, W2, H); cardTex.needsUpdate = true; return; }
     g.fillStyle = '#0b0a09'; g.fillRect(0, 0, W2, H);
     const vg = g.createRadialGradient(W2 / 2, H / 2, 60, W2 / 2, H / 2, 620); vg.addColorStop(0, 'rgba(70,56,38,.55)'); vg.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = vg; g.fillRect(0, 0, W2, H);
@@ -504,7 +512,7 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
 
   /* ---------------- the film being shown, here ----------------
      cur: the room's screen as last synced. F: this copy's player for it, made lazily:
-       F = { kind, src, list (urls to try), i, cors, mode: 'idle'|'loading'|'tex'|'dom'|'yt'|'error', dur, frame, ended, mine } */
+       F = { kind, src, list (urls to try), i, cors, mode: 'idle'|'loading'|'tex'|'over'|'dom'|'yt'|'error', dur, frame, ended, mine } */
   let cur = null, curKey = '', syncs = 0, F = null, pending = null;
   let video = null, vtex = null, watching = false, viewOpen = false, Y = null;
   let ours = 0;                                         // when this page last told the player to do something
@@ -515,6 +523,9 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   let texAt = -1, blindBrowser = false;                 // the frame last handed to the 3D screen; this browser can't paint films there
   let probeC = null, probeAt = 0, probeT = -1, blank = 0, dark = 0, darkSig = '';
   let relayC = null, relayG = null;                     // the canvas each frame is drawn into for the 3D screen
+  let overW = 640, overH = 480;                         // the overlaid <video>'s own size, before its warp
+  // Safari and everything on an iPhone or iPad (Chrome and Firefox there are Safari underneath), or ?overlay to try it
+  const APPLE = (/AppleWebKit/.test(navigator.userAgent) && !/(Chrome|Chromium|Edg|OPR|Firefox)\//.test(navigator.userAgent)) || /[?&]overlay\b/.test(location.search);
   const now = () => performance.now();
   const shared = () => !!(ctx && ctx.shared && ctx.shared());
   const isHost = () => !ctx || !ctx.host || ctx.host();
@@ -523,7 +534,7 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   const inWindow = () => F && (F.kind === 'youtube' || F.mode === 'dom');
   function localTime() {
     if (F && F.kind === 'youtube' && Y && Y.ready) return Y.time + (Y.state === 1 ? (now() - Y.timeAt) / 1000 : 0);
-    if (F && F.kind === 'file' && video && video.readyState >= 1 && (F.mode === 'tex' || F.mode === 'dom')) return video.currentTime;
+    if (F && F.kind === 'file' && video && video.readyState >= 1 && (F.mode === 'tex' || F.mode === 'dom' || F.mode === 'over')) return video.currentTime;
     return Math.max(0, expected());
   }
 
@@ -572,7 +583,7 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
     F = null; watching = false;
   }
 
-  /* --- the <video>: made on first use, painted on the screen when its server allows (CORS), else shown in a window --- */
+  /* --- the <video>: made on first use, copied onto the screen when its server allows (CORS), else laid over it --- */
   function ensureVideo() {
     if (video) return video;
     video = document.createElement('video');
@@ -581,9 +592,9 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
     const mineEv = (fn) => (e) => { if (F && F.kind === 'file' && F.url && video.src === F.url) fn(e); };
     video.addEventListener('loadedmetadata', mineEv(onMeta));
     video.addEventListener('error', mineEv(onErr));
-    video.addEventListener('playing', mineEv(() => { F.frame = true; paint(); }));
+    video.addEventListener('playing', mineEv(() => { F.frame = true; paint(); wake(); }));   // the loop may have slept while it loaded
     video.addEventListener('seeked', mineEv(() => { F.frame = true; relayFrame(); wake(); }));
-    video.addEventListener('resize', mineEv(() => { if (F.mode === 'tex' && relayC && (relayC.width < 3 || Math.abs(relayC.width / relayC.height - video.videoWidth / Math.max(1, video.videoHeight)) > 0.01)) { makeRelay(); relayFrame(); paint(); } }));
+    video.addEventListener('resize', mineEv(() => { if (F.mode === 'over') { sizeOver(); paint(); return; } if (F.mode === 'tex' && relayC && (relayC.width < 3 || Math.abs(relayC.width / relayC.height - video.videoWidth / Math.max(1, video.videoHeight)) > 0.01)) { makeRelay(); relayFrame(); paint(); } }));
     video.addEventListener('waiting', mineEv(() => paint()));
     video.addEventListener('ended', mineEv(onEnded));
     // in the window or full screen, the player's own buttons work for the whole room; its sound is yours alone
@@ -610,21 +621,16 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   }
   function onMeta() {
     F.dur = isFinite(video.duration) ? video.duration : 0;
-    if (F.cors && !blindBrowser) {
+    if (F.cors && !blindBrowser && !APPLE) {
       F.mode = 'tex'; probeT = -1; blank = 0; dark = 0; darkSig = '';
+      if (!fullVid && video.parentNode !== $('#cineHold')) { video.style.cssText = ''; $('#cineHold').appendChild(video); }
       makeRelay();
-    } else {
-      F.mode = 'dom';                                    // the server won't share its pixels, or this browser can't paint them: a window
-      if (!fullVid) {
-        if (F.mine) openView();
-        else if (!viewOpen) ctx.toast('This film can only be shown in a window. Click the screen to watch.', 3600);
-      }
-    }
+    } else toOver();                                     // Safari, or a server that won't share its pixels: the overlay
     drive(true); paint();
   }
   function onErr() {
     if (F.i + 1 < F.list.length) { F.i++; loadSrc(); return; }
-    if (F.cors) { F.cors = false; F.i = 0; loadSrc(); return; }   // perhaps only CORS is missing: try it for a window
+    if (F.cors) { F.cors = false; F.i = 0; loadSrc(); return; }   // perhaps only CORS is missing: try without, for the overlay
     F.mode = 'error';
     if (viewOpen) closeView(true);
     if (F.mine) ctx.toast(FILM_OF.get(F.src) ? 'That film could not be loaded from Wikimedia Commons. Check the connection and try again.' : 'That film could not be loaded. For a link, use a direct .mp4 or .webm file.', 4200);
@@ -653,6 +659,48 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   function relayFrame() {
     if (!vtex || !relayG || !video || video.readyState < 2) return;
     try { relayG.drawImage(video, 0, 0, relayC.width, relayC.height); vtex.needsUpdate = true; texAt = video.currentTime; } catch (e) {}
+  }
+  /* --- the overlay: the <video> itself over the canvas, warped onto the screen's picture each frame --- */
+  function toOver() {
+    F.mode = 'over';
+    if (vtex) { vtex.dispose(); vtex = null; }
+    if (O.picMat) O.picMat.map = cardTex;
+    video.controls = false;
+    if (!fullVid) $('#cineOver').appendChild(video);
+    sizeOver();
+  }
+  function sizeOver() {
+    const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+    overW = 640; overH = Math.max(2, Math.round(640 * vh / vw));
+    video.style.width = overW + 'px'; video.style.height = overH + 'px';
+    hideOver();
+  }
+  // out of sight: tiny and clear rather than visibility:hidden, which an iPhone may take as "don't play"
+  function hideOver() { if (video.style.opacity !== '0') { video.style.opacity = '0'; video.style.transform = 'scale(0.004)'; } }
+  // the 3x3 projective map taking the video's corners (0,0) (w,0) (0,h) (w,h) to four points on the page, as CSS
+  function warp(w, h, q) {
+    const adj = (m) => [m[4] * m[8] - m[5] * m[7], m[2] * m[7] - m[1] * m[8], m[1] * m[5] - m[2] * m[4], m[5] * m[6] - m[3] * m[8], m[0] * m[8] - m[2] * m[6], m[2] * m[3] - m[0] * m[5], m[3] * m[7] - m[4] * m[6], m[1] * m[6] - m[0] * m[7], m[0] * m[4] - m[1] * m[3]];
+    const mm = (a, b) => { const c = []; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) c.push(a[3 * i] * b[j] + a[3 * i + 1] * b[3 + j] + a[3 * i + 2] * b[6 + j]); return c; };
+    const mv = (m, v) => [m[0] * v[0] + m[1] * v[1] + m[2] * v[2], m[3] * v[0] + m[4] * v[1] + m[5] * v[2], m[6] * v[0] + m[7] * v[1] + m[8] * v[2]];
+    const basis = (p) => { const m = [p[0][0], p[1][0], p[2][0], p[0][1], p[1][1], p[2][1], 1, 1, 1], v = mv(adj(m), [p[3][0], p[3][1], 1]); return mm(m, [v[0], 0, 0, 0, v[1], 0, 0, 0, v[2]]); };
+    const t = mm(basis(q), adj(basis([[0, 0], [w, 0], [0, h], [w, h]])));
+    for (let i = 0; i < 9; i++) t[i] /= t[8];
+    return 'matrix3d(' + [t[0], t[3], 0, t[6], t[1], t[4], 0, t[7], 0, 0, 1, 0, t[2], t[5], 0, t[8]].join(',') + ')';
+  }
+  const _oc = [0, 1, 2, 3].map(() => new T.Vector3());
+  // main.js calls this right after it draws the room, so the video sits exactly on that frame's screen
+  function afterRender() {
+    if (!F || F.mode !== 'over' || !video || video.parentNode !== $('#cineOver')) return;
+    const cam = ctx.camera;
+    let show = !!O.overOn && screenReady() && cam.position.z < 8.3, q = null;   // not from the Great Hall, through its wall
+    if (show) {
+      q = [[-0.5, 0.5], [0.5, 0.5], [-0.5, -0.5], [0.5, -0.5]].map(([x, y], i) => { const v = _oc[i].set(x, y, 0); O.picture.localToWorld(v); v.project(cam); return v; });
+      if (q.some(v => v.z < -1 || v.z > 1)) show = false;                       // a corner behind you: no warp can draw it
+    }
+    if (!show) { hideOver(); return; }
+    const el = ctx.renderer.domElement, w = el.clientWidth || innerWidth, h = el.clientHeight || innerHeight;   // where the frame is shown
+    video.style.transform = warp(overW, overH, q.map(v => [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h]));
+    video.style.opacity = String(Math.max(0.01, Math.min(1, A.lamp)));
   }
   function seekVideo(t) { if (!video || !isFinite(t)) return; ours = now(); try { video.currentTime = Math.max(0, F.dur ? Math.min(t, F.dur - 0.05) : t); } catch (e) {} }
   function playVideo() {
@@ -696,7 +744,7 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   function systemFull(v) { if (!v || !v.webkitEnterFullscreen) return false; try { v.webkitEnterFullscreen(); return true; } catch (e) { return false; } }
   function restoreVideo() {
     fullVid = false;
-    if (video && video.parentNode === $('#cineFull')) { video.controls = false; $('#cineHold').appendChild(video); }
+    if (video && video.parentNode === $('#cineFull')) { video.controls = false; $(F && F.mode === 'over' ? '#cineOver' : '#cineHold').appendChild(video); if (F && F.mode === 'over') hideOver(); }   // until the next frame places it
     paint(); wake();
   }
   function fullscreen() {
@@ -715,7 +763,7 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
     // a film on the 3D screen: its own picture fills your screen, with its own play, seek and volume controls
     if (F.mode === 'idle') loadSrc();
     const v = ensureVideo();
-    $('#cineFull').appendChild(v); v.controls = true;
+    $('#cineFull').appendChild(v); v.controls = true; v.style.transform = ''; v.style.opacity = '';
     sysAt = now(); v.volume = vol;
     fullVid = true;
     askFull(v).then(() => { drive(true); paint(); wake(); }, () => {
@@ -729,7 +777,7 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   document.addEventListener('webkitfullscreenchange', onFullChange);
 
   /* --- some browsers play a film yet can't paint its pictures onto the 3D screen, which stays black while the
-         sound runs. Look at a frame now and then; if nothing ever comes through, show the film in the window. --- */
+         sound runs. Look at a frame now and then; if nothing ever comes through, use the overlay. --- */
   function probeFrames(tn) {
     if (!F || F.mode !== 'tex' || F.seen || !video || video.paused || video.readyState < 2 || fullVid || tn - probeAt < 1500) return;
     probeAt = tn;
@@ -749,18 +797,13 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
       const d = probeC.getContext('2d').getImageData(0, 0, 8, 8).data; let mx = 0, sig = '';
       for (let i = 0; i < d.length; i += 4) { mx = Math.max(mx, d[i], d[i + 1], d[i + 2]); sig += d[i] + ','; }
       if (mx >= 6 || (dark && sig !== darkSig)) { F.seen = true; dark = 0; return; }   // real pictures (even film grain in the dark moves)
-      darkSig = sig; if (++dark >= 6) blind();                                         // a browser handing over only black (~9 s)
+      darkSig = sig; if (++dark >= 8) blind();                                         // a browser handing over only black (~12 s)
     }
     else if (ok === false && ++blank >= 2) blind();
   }
   function blind() {
-    blindBrowser = true; F.mode = 'dom'; F.blind = true;
-    if (vtex) { vtex.dispose(); vtex = null; }
-    if (O.picMat) O.picMat.map = cardTex;
-    const busy = document.body.classList.contains('reading') || [...document.querySelectorAll('.sheet')].some(x => !x.hidden);
-    if (!busy && cur && cur.playing) openView();
-    else ctx.toast('This browser can’t paint the film onto the screen. Click the screen to watch it in a window.', 4200);
-    drive(true); paint();
+    blindBrowser = true; F.blind = true;
+    toOver(); drive(true); paint();
   }
 
   /* --- YouTube, in a frame, steered with the player's postMessage commands --- */
@@ -852,9 +895,9 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
     const s = cur, exp = expected(), t = now();
     if (F.kind === 'file') {
       if (F.mode === 'idle') { if (s.playing) loadSrc(); else return; }
-      if ((F.mode !== 'tex' && F.mode !== 'dom') || !video || video.readyState < 1) return;
+      if ((F.mode !== 'tex' && F.mode !== 'dom' && F.mode !== 'over') || !video || video.readyState < 1) return;
       if (s.playing && F.dur && exp >= F.dur - 0.2 && !F.ended) { onEnded(); return; }    // the room's clock ran past the end
-      const show = F.mode === 'tex' || (viewOpen && watching) || fullVid;
+      const show = F.mode === 'tex' || F.mode === 'over' || (viewOpen && watching) || fullVid;
       const go = s.playing && show && exp >= 0 && (F.mode === 'dom' || fullVid || screenReady()) && !(F.dur && exp >= F.dur - 0.2);
       if (go) {
         if (video.paused) { if (Math.abs(video.currentTime - exp) > 0.75) seekVideo(exp); playVideo(); lastDrift = t; }
@@ -968,7 +1011,7 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
     if (F && F.mode === 'dom') return (s.playing ? 'Playing' : 'Paused') + ' in a window (this file’s server does not let it be painted on the screen)' + (viewOpen ? '.' : ' — Watch to see it.');
     if (!s.down) return 'Paused at ' + fmt(Math.max(0, s.pos)) + '. The screen is rolled up.';
     if (s.playing && expected() < 0) return 'The projectionist is threading the film…';
-    if (s.playing && F && (F.mode === 'loading' || (video && video.readyState < 3 && F.mode === 'tex'))) return 'Loading…';
+    if (s.playing && F && (F.mode === 'loading' || (video && video.readyState < 3 && (F.mode === 'tex' || F.mode === 'over')))) return 'Loading…';
     if (F && F.ended && !s.playing) return 'The end.';
     return s.playing ? 'Playing on the screen.' : 'Paused at ' + fmt(Math.max(0, s.pos)) + '.';
   }
@@ -1022,18 +1065,21 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   function paintCard() {
     if (!built) return;
     const s = cur;
-    let kind = 'house', extra = '', tex = false;
+    let kind = 'house', extra = '', tex = false, over = false;
     if (s && s.src) {
       if (F && F.mode === 'error') kind = 'error';
       else if (F && F.kind === 'youtube') { kind = 'window'; extra = viewOpen ? 'on the big screen, in its window' : 'Click the screen to watch'; }
       else if (F && F.mode === 'dom') { kind = 'window'; extra = viewOpen ? 'showing in a window' : 'Click the screen to watch, in a window'; }
       else if (F && F.ended && !s.playing) kind = 'end';
       else if (F && F.mode === 'tex' && F.frame && vtex && !(s.playing && expected() < 0)) tex = true;
+      else if (F && F.mode === 'over' && F.frame && !(s.playing && expected() < 0)) over = true;
       else if (s.playing) { kind = 'intro'; extra = F && F.mode === 'loading' && expected() > 1 ? 'Loading…' : ''; }
       else kind = 'paused';
     }
-    if (tex) {
-      if (O.picMat.map !== vtex) O.picMat.map = vtex;
+    O.overOn = over;
+    if (tex || over) {
+      if (tex) { if (O.picMat.map !== vtex) O.picMat.map = vtex; }
+      else { drawCard('blank', s); if (O.picMat.map !== cardTex) O.picMat.map = cardTex; }   // the overlaid video sits on this
       const vw = video.videoWidth || 4, vh = video.videoHeight || 3, a = vw / vh;
       const w = a >= SCR.pw / SCR.ph ? SCR.pw : SCR.ph * a, h = a >= SCR.pw / SCR.ph ? SCR.pw / a : SCR.ph;
       O.picture.scale.set(w, h, 1); beamTo(w, h);
@@ -1067,17 +1113,17 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
     if (rolling && A.lamp > 0.5) A.reel += dt * 2.2;
     // the lights go down while a film plays on the screen, in this room
     const cam = ctx.camera.position, inRoom = cam.z < 8.3;
-    const dimWant = film && F.mode === 'tex' && cur.playing && F.frame && inRoom && A.lamp > 0.5 ? 1 : 0;
+    const dimWant = film && (F.mode === 'tex' || F.mode === 'over') && cur.playing && F.frame && inRoom && A.lamp > 0.5 ? 1 : 0;
     const dim0 = A.dim; A.dim = toward(A.dim, dimWant, dt / 1.6);
     if (A.dim !== dim0) ctx.renderer.toneMappingExposure = baseExposure * (1 - 0.3 * A.dim);
-    if (film && F.kind === 'file' && video && F.mode === 'tex' && !fullVid) {
+    if (film && F.kind === 'file' && video && (F.mode === 'tex' || F.mode === 'over') && !fullVid) {
       // the sound comes from the screen: softer across the room, faint in the hall (in the window or full screen, the player's own volume rules)
       const d = Math.hypot(cam.x, cam.y - PIC_Y, cam.z - SCR.z);
       const v = vol / (1 + Math.max(0, d - 6) * 0.15);
       if (Math.abs(video.volume - v) > 0.01) { sysAt = now(); video.volume = Math.max(0, Math.min(1, v)); }
       // copy each new frame to the screen ourselves (no waiting on requestVideoFrameCallback, which browsers may
       // never call for a video they think nobody sees: ours is hidden, the 3D screen shows it)
-      if (video.currentTime !== texAt) relayFrame();
+      if (F.mode === 'tex' && video.currentTime !== texAt) relayFrame();
     }
     if (A.lamp > 0.003) O.beamMat.uniforms.uT.value += dt;
     drive(false);
@@ -1153,8 +1199,8 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
   }
   // for tests: run the animations to their ends now
   function settle(n) { for (let i = 0; i < (n || 160); i++) step(0.05); pose(); return { k: A.k, lift: A.lift, lid: A.lid, lamp: A.lamp }; }
-  function state() { return { beam: O.beam && { on: O.beam.visible, verts: O.beam.geometry.attributes.position ? O.beam.geometry.attributes.position.count : 0, uO: O.beamMat.uniforms.uO.value }, cur, mode: F && F.mode, kind: F && F.kind, frame: F && F.frame, dur: F && F.dur, watching, viewOpen, url: F && F.url, time: localTime(), k: A.k, lift: A.lift, lamp: A.lamp, dim: A.dim, exposure: ctx && ctx.renderer.toneMappingExposure, video: !!video, paused: video ? video.paused : null, muted: effMuted(), elMuted: video ? video.muted : null, full: fullVid, blind: !!(F && F.blind), texAt, relay: relayC ? relayC.width + 'x' + relayC.height : null }; }
+  function state() { return { beam: O.beam && { on: O.beam.visible, verts: O.beam.geometry.attributes.position ? O.beam.geometry.attributes.position.count : 0, uO: O.beamMat.uniforms.uO.value }, cur, mode: F && F.mode, kind: F && F.kind, frame: F && F.frame, dur: F && F.dur, watching, viewOpen, url: F && F.url, time: localTime(), k: A.k, lift: A.lift, lamp: A.lamp, dim: A.dim, exposure: ctx && ctx.renderer.toneMappingExposure, video: !!video, paused: video ? video.paused : null, muted: effMuted(), elMuted: video ? video.muted : null, full: fullVid, blind: !!(F && F.blind), texAt, relay: relayC ? relayC.width + 'x' + relayC.height : null, over: !!O.overOn, overVisible: !!(video && video.parentNode && video.parentNode.id === 'cineOver' && +video.style.opacity > 0.05), overTransform: video && video.parentNode && video.parentNode.id === 'cineOver' ? video.style.transform.slice(0, 40) : null, apple: APPLE }; }
 
   const hasFilm = () => !!(cur && cur.src);
-  return { FILMS, init, sanitize, applyOp, sync, acts, label, open, settle, state, ytId, pickables, fullscreen, toggleMute, hasFilm };
+  return { FILMS, init, sanitize, applyOp, sync, acts, label, open, settle, state, ytId, pickables, fullscreen, toggleMute, hasFilm, afterRender };
 })();

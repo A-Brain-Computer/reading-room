@@ -1555,7 +1555,7 @@
     updateAudio();
     posT += dt; if (posT > 3 && S.mode !== 'title') { posT = 0; savePos(); }
     netT += dt; if (S.shared && netT > 0.1) { netT = 0; NET.presence(myPresence()); }
-    if (S.mode !== 'reader') renderer.render(scene, camera);
+    if (S.mode !== 'reader') { renderer.render(scene, camera); if (CN) CN.afterRender(); }   // a film shown over the canvas follows this frame
   }
   addEventListener('pagehide', () => { if (S.ready && S.room && S.mode !== 'title') { savePos(); if (!S.shared || (S.isHost && !S.commons)) store.save('room', S.room); } });
 
