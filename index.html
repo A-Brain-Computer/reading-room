@@ -128,13 +128,13 @@ body.shared #chat{display:block}
 /* in a shared room the chat keeps the bottom-left corner: the prompt and its buttons centre in the
    space beside it, or, on a narrow screen, the chat sits above them */
 @media (min-width:761px){ body.shared #bar{left:calc(var(--sal) + 344px);right:12px;transform:none;max-width:none} }
-@media (max-width:760px){ body.shared #chat{bottom:calc(var(--sab) + 128px)} body.shared #chatlog{max-height:84px} }
+@media (max-width:760px){ body.shared #chat{bottom:calc(var(--sab) + 22px + var(--barh,52px))} body.shared #chatlog{max-height:64px} }
 #chatlog{max-height:150px;overflow-y:auto;font-size:13px;line-height:1.35;text-shadow:0 1px 2px #000;margin-bottom:6px;scrollbar-width:none}
 #chatlog div b{color:var(--gold2)}
 #chatlog div.sys{color:var(--dim);font-style:italic}
 #chatin{width:100%;border:1px solid var(--line);background:rgba(13,10,7,.8);border-radius:10px;padding:8px 10px;outline:none;color:var(--ink);font-size:14px}
 #chatin:focus{border-color:var(--gold)}
-body.touch.shared #bar{bottom:calc(var(--sab) + 70px)}
+@media (min-width:761px){ body.touch.shared #bar{bottom:calc(var(--sab) + 70px)} }
 
 /* ---------- sheets (catalog, invite, arrange, help) ---------- */
 .sheet{position:fixed;z-index:50;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,3,2,.55);padding:calc(var(--sat) + 14px) calc(var(--sar) + 14px) calc(var(--sab) + 14px) calc(var(--sal) + 14px)}
@@ -323,7 +323,7 @@ body.arranging #arrange{display:flex}
       <p><b style="color:var(--gold2)">The Great Hall.</b> The double doors on the south wall, across from the fire, open when you finish your first chapter. Behind them is a domed hall with a card catalog at its centre, and shelves for the library to grow into. Off its east side, the Banned Books gallery opens when you finish your first whole book (some are short). In a friend's room, the doors follow the host's reading.</p>
       <p><b style="color:var(--gold2)">Read.</b> Sit in any chair, sofa, stool or window seat while holding a book and it opens. Or press <b>R</b> to read standing up. Your place in every book is kept. The speaker button in the reader reads the book aloud to you.</p>
       <p><b style="color:var(--gold2)">Notes in the margin.</b> In the reader, select a few words (or tap a paragraph) and choose <i>Note</i>. Your notes stay with the book; in a shared room, friends see them too.</p>
-      <p><b style="color:var(--gold2)">The cinema.</b> Pull the cord by the fire and a screen comes down over the mantel; the projector behind the sofa rises to show race films and early Black cinema, all in the public domain. Click the projector to choose a film, or paste a direct .mp4 or .webm link, or a YouTube link (which plays in a window). In a shared room everyone sees the same film. Esc closes the window.</p>
+      <p><b style="color:var(--gold2)">The cinema.</b> Pull the cord by the fire and a screen comes down over the mantel; the projector behind the sofa rises to show race films and early Black cinema, all in the public domain. Click the projector to choose a film, or paste a direct .mp4 or .webm link, or a YouTube link (which plays in a window). In a shared room everyone sees the same film. To watch it filling your own screen, press <b>G</b> or the full-screen button; <b>M</b> or the speaker button mutes it for you alone. Esc closes the window.</p>
       <p><b style="color:var(--gold2)">Rearrange.</b> Press Tab (or <i>Arrange</i>) to move furniture, turn it with Q and E, add new pieces or put them away. Bookcases you add come with empty shelves for your own sections.</p>
       <p><b style="color:var(--gold2)">Read together.</b> <i>Invite</i> makes a link. Friends who open it walk into your room as their reader, see what you're reading and can talk in the room. On the shared claude.ai page there is no link to send: everyone who opens the page walks into one shared library (up to six at a time is comfortable), and books and furniture stay where you all leave them.</p>
       <p>The texts are U.S. public domain, from the Project Gutenberg editions; see <a href="SOURCES.md" style="color:var(--gold)">SOURCES.md</a>.</p>

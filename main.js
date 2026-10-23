@@ -408,7 +408,11 @@
   function typing() { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'); }
   window.addEventListener('keydown', (e) => {
     if (S.mode === 'reader' || typing()) return;
-    if (S.sheet) { if (e.key === 'Escape') closeSheets(); return; }
+    if (S.sheet) {
+      if (e.key === 'Escape') closeSheets();
+      else if (S.sheet === 'cineView' && CN) { const k2 = e.key.toLowerCase(); if (k2 === 'm') CN.toggleMute(); else if (k2 === 'g') CN.fullscreen(); }
+      return;
+    }
     if (S.mode === 'title') return;
     const k = e.key.toLowerCase();
     keys.add(e.code);
@@ -431,6 +435,8 @@
     const acts = currentActs();
     const byKey = acts.find(a => a.key && a.key.toLowerCase() === k);
     if (byKey) { e.preventDefault(); byKey.fn(); return; }
+    if (k === 'm' && CN && CN.toggleMute()) return;                          // the film's sound, for you alone
+    if (k === 'g' && CN && CN.hasFilm()) { CN.fullscreen(); return; }
     if (k === 'r' && S.room.hands[S.pid]) { readNow(S.room.hands[S.pid]); return; }
     if (k === ' ' && P.seat) { e.preventDefault(); standUp(); }
   });
@@ -444,8 +450,8 @@
     resumeAudio();
     if (e.pointerType === 'touch') {
       if (!stick && e.clientX < innerWidth * 0.42 && e.clientY > innerHeight * 0.3) {
-        stick = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0 };
-        const st = $('#stick'); st.style.display = 'block'; st.style.left = e.clientX + 'px'; st.style.top = e.clientY + 'px';
+        // the thumb's corner: dragging walks, a quick tap still takes a book or sits (endPointer)
+        stick = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, moved: false, t: performance.now() };
       } else if (!lookTouch) lookTouch = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, t: performance.now() };
       else if (!pinch) {                                 // a second finger: pinch to zoom
         pinch = { id: e.pointerId, x: e.clientX, y: e.clientY, d0: Math.max(30, Math.hypot(e.clientX - lookTouch.x, e.clientY - lookTouch.y)), z0: Z.target };
@@ -460,6 +466,11 @@
     if (e.pointerType !== 'touch') { mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = true; }
     if (stick && e.pointerId === stick.id) {
       let dx = e.clientX - stick.x0, dy = e.clientY - stick.y0; const d = Math.hypot(dx, dy), m = 50;
+      if (!stick.moved) {
+        if (d < 12) return;
+        stick.moved = true;
+        const st = $('#stick'); st.style.display = 'block'; st.style.left = stick.x0 + 'px'; st.style.top = stick.y0 + 'px';
+      }
       if (d > m) { dx *= m / d; dy *= m / d; }
       stick.dx = dx / m; stick.dy = dy / m;
       $('#stick i').style.transform = `translate(${dx}px,${dy}px)`;
@@ -481,7 +492,12 @@
     if (L.moved) look(dx, dy, e.pointerType === 'touch' ? 0.0062 : 0.0045);
   });
   function endPointer(e) {
-    if (stick && e.pointerId === stick.id) { stick = null; $('#stick').style.display = 'none'; $('#stick i').style.transform = ''; return; }
+    if (stick && e.pointerId === stick.id) {
+      const tap = !stick.moved && e.type === 'pointerup' && performance.now() - stick.t < 450;
+      stick = null; $('#stick').style.display = 'none'; $('#stick i').style.transform = '';
+      if (tap) tapAt(e.clientX, e.clientY);
+      return;
+    }
     if (pinch && e.pointerId === pinch.id) { pinch = null; return; }
     if (pinch && lookTouch && e.pointerId === lookTouch.id) {   // the first finger lifts: the second one goes on looking
       lookTouch = { id: pinch.id, x: pinch.x, y: pinch.y, sx: pinch.x, sy: pinch.y, moved: true, t: performance.now() };
@@ -705,11 +721,23 @@
       arrangePick(true); arrangeClick(); return;
     }
     if (S.mode !== 'play') return;
-    const t = resolve(W.pick(aimFrom(x, y), 'play', 40));
+    let t = resolve(W.pick(aimFrom(x, y), 'play', 40));
+    if (touch && !actsFor(t).length) t = nearBook(x, y) || t;
     target = t;
     const acts = actsFor(t);
     if (acts.length) { acts[0].fn(); return; }
     if (t && t.kind === 'floor') { if (P.seat) standUp(true); P.walkTo = { x: t.point.x, z: t.point.z, reach: 0.25, t: 0 }; }
+  }
+  // the book nearest a tap that missed: rings of rays around the fingertip, closest ring first
+  function nearBook(x, y) {
+    for (const r of [10, 20, 30]) {
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4 + (r === 20 ? Math.PI / 8 : 0);
+        const t = resolve(W.pick(aimFrom(x + Math.cos(a) * r, y + Math.sin(a) * r), 'play', 40));
+        if (t && t.kind === 'book' && t.loc && t.loc.k !== 'hand') { if (t.point) t.point = t.point.clone(); return t; }
+      }
+    }
+    return null;
   }
   function updateTarget() {
     if (S.mode !== 'play') return;
@@ -733,6 +761,12 @@
     paintBar();
   }
   let barKey = '';
+  // the bar's height, for a phone's chat to sit on (index.html): measured whenever its prompt or buttons change
+  const barEl = $('#bar');
+  let barH = -1;
+  function sizeBar() { const h = barEl.offsetHeight; if (h !== barH) { barH = h; document.documentElement.style.setProperty('--barh', h + 'px'); } }
+  const barWatch = window.ResizeObserver ? new ResizeObserver(sizeBar) : null;
+  if (barWatch) barWatch.observe(barEl);
   function paintBar() {
     const acts = currentActs();
     let label = target && target.label ? target.label : '';
@@ -749,6 +783,7 @@
       b.addEventListener('click', (e) => { e.stopPropagation(); a.fn(); });
       box.appendChild(b);
     });
+    sizeBar();
   }
 
   /* ---------------- sitting and reading ---------------- */
@@ -1381,8 +1416,7 @@
       // a hidden reader until you meet them: a dark figure, no name, and how far you are from meeting them
       b.title = locked ? `Someone is waiting to be met. Take down ten books (${Math.min(pr.taken, 10)} so far) and read one to the end (${Math.min(pr.done, 1)} of 1).` : p.line;
       if (locked) b.classList.add('locked');
-      let img = '<span class="ph"></span>';
-      if (S.gl) { try { img = `<img alt="" src="${AV.portrait(renderer, p.id)}">`; } catch (e) {} }
+      const img = `<img alt="" src="portraits/${p.id}.webp" width="300" height="400" decoding="async" data-id="${p.id}">`;
       b.innerHTML = locked ? `${img}<span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">${Math.min(pr.taken, 10)}/10 books · ${Math.min(pr.done, 1)}/1 read</span>`
         : `${img}<span class="n">${esc(p.name)}</span><span class="y">${esc(p.years)}</span>`;
       b.onclick = () => {
@@ -1391,6 +1425,8 @@
       };
       box.appendChild(b);
     });
+    // a missing picture is drawn here instead, one at a time, after the page is up
+    box.querySelectorAll('img[data-id]').forEach(im => { im.onerror = () => { im.onerror = null; if (S.gl) setTimeout(() => { try { im.src = AV.portrait(renderer, im.dataset.id); } catch (e) {} }, 50); }; });
   }
   function enter() {
     const nm = $('#nm').value.trim().slice(0, 14) || defaultName();
@@ -1442,6 +1478,7 @@
     if (AV && AV.ALIAS && AV.ALIAS[S.me.avatar]) S.me.avatar = AV.ALIAS[S.me.avatar];   // saved 'tubman' -> 'wheatley', 'truth' -> 'bailey'
     $('#nm').value = S.me.name || defaultName();
     if (QS.get('room')) { const n = $('#invNote'); n.hidden = false; n.textContent = 'You’re invited to a friend’s reading room. Choose who you’ll be, then walk in.'; $('#go').textContent = 'Walk into their room'; }
+    buildWho();                                          // the faces first: pictures, before any of the room is built
     msg('Opening the doors…');
     try {
       const res = await fetch('books/index.json');
@@ -1452,6 +1489,7 @@
     RD.init({ store, books: S.books, onClose: onReaderClosed, award: (n) => { try { if (A && A.award) { const k = A.award(SLUG, 'read', n || 1); if (k && k.awarded) toast('+1 bead on your keyring for a chapter read.', 2200); } } catch (e) {} },
       onNote: (bookId, note) => { if (S.shared && note.shared) NET.note(bookId, note); },
       onNoteChange: (bookId, note, id) => { if (S.shared && NET) NET.noteChange(bookId, note, id); }, others: () => S.shared });
+    buildWho();                                          // again, with your reading counted (how near you are to meeting Malcolm X)
     renderer = W ? makeRenderer() : null;
     S.gl = !!renderer;
     if (!S.gl) {
@@ -1476,7 +1514,6 @@
     relayout();
     const pos = store.load('pos', null);
     if (pos && typeof pos.x === 'number') { const p = collide(pos.x, pos.z, 0.28); P.x = p.x; P.z = p.z; P.yaw = pos.yaw || 0; P.pitch = pos.pitch || 0; if (pos.view === 'third') { S.view = 'third'; $('#bView').setAttribute('aria-pressed', 'true'); } }
-    buildWho();
     buildPalette();
     addEventListener('resize', onResize);
     if (NET) {
