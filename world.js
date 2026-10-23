@@ -12,7 +12,7 @@
 
    API: init(renderer) -> scene;  CATALOG;  spawn(f) / place(f) / despawn(id);  layoutBooks(room, handIds);
         pick(raycaster, mode);  highlight(target);  colliders();  seatList();  tick(dt, t, camPos);
-        bookMesh(id);  rowInfo(id);  furnInfo(id);  ROOM;  bookDims(meta)
+        bookMesh(id);  rowInfo(id);  furnInfo(id);  ROOM;  bookDims(meta);  walk(x, z, m);  plan(x0, z0, x1, z1, reach)
    Every piece of furniture is a Group (one mesh per material); books are separate meshes parented to
    the shelf or table they sit on, so moving a table carries its pile. */
 'use strict';
@@ -1087,20 +1087,118 @@ const RR_WORLD = (() => {
     }
     return false;
   }
-  const areaOf = (x, z) => (z <= ROOM.z1 + 0.2 ? 'room' : x >= 11 && Math.abs(z - HALL.cz) < 4 ? 'gallery' : 'hall');
-  // waypoints through the doorways between where you are and where you're going
-  const GATES = { 'room>hall': [[0, 7.0], [0, 11.8]], 'hall>gallery': [[9.4, 21], [12.6, 21]] };
-  function route(x0, z0, x1, z1) {
-    const a = areaOf(x0, z0), b = areaOf(x1, z1);
-    if (a === b) return [];
-    const seq = { room: 0, hall: 1, gallery: 2 }, names = ['room', 'hall', 'gallery'];
-    const out = [];
-    for (let i = seq[a]; i !== seq[b]; i += seq[b] > seq[a] ? 1 : -1) {
-      const j = i + (seq[b] > seq[a] ? 1 : -1), lo = Math.min(i, j);
-      const g = GATES[names[lo] + '>' + names[lo + 1]];
-      (j > i ? g : g.slice().reverse()).forEach(([x, z]) => out.push({ x, z }));
+  /* finding the way round things: the open floor as a grid of 0.2 m cells, each knowing how far it is from
+     the nearest obstacle (furniture, a bookcase, a wall). Cells too tight for a reader's shoulders are
+     closed, and cells close to things cost a little more, so a path keeps to the middle of an aisle. A* finds
+     the cheapest way to a cell within reach of the target that can see it (nothing between but the thing
+     itself), and the path is pulled straight wherever there is room. Doorways need nothing special: an open
+     door's passage is open floor. */
+  const CELL = 0.2, CLEAR = 0.29, ROOMY = 0.42, CAP = 0.75;
+  function floorGrid() {
+    const as = openAreas();
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const a of as) {
+      const b = a.rect || [a.circle[0] - a.circle[2], a.circle[0] + a.circle[2], a.circle[1] - a.circle[2], a.circle[1] + a.circle[2]];
+      x0 = Math.min(x0, b[0]); x1 = Math.max(x1, b[1]); z0 = Math.min(z0, b[2]); z1 = Math.max(z1, b[3]);
     }
-    return out;
+    const nx = Math.ceil((x1 - x0) / CELL), nz = Math.ceil((z1 - z0) / CELL), clr = new Float32Array(nx * nz);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const x = x0 + (i + 0.5) * CELL, z = z0 + (j + 0.5) * CELL;
+      let e = 0;                                                   // how far inside the open floor
+      for (const a of as) {
+        const d = a.rect ? Math.min(x - a.rect[0], a.rect[1] - x, z - a.rect[2], a.rect[3] - z) : a.circle[2] - Math.hypot(x - a.circle[0], z - a.circle[1]);
+        if (d > e) e = d;
+      }
+      clr[j * nx + i] = Math.min(CAP, e - 0.01);                   // walk() keeps you 0.30 from an edge, 0.28 from furniture
+    }
+    for (const c of colliders()) {
+      const cr = Math.cos(c.r || 0), sr = Math.sin(c.r || 0);
+      const ex = Math.abs(cr) * c.hw + Math.abs(sr) * c.hd + CAP, ez = Math.abs(sr) * c.hw + Math.abs(cr) * c.hd + CAP;
+      const i0 = Math.max(0, Math.floor((c.x - ex - x0) / CELL)), i1 = Math.min(nx - 1, Math.floor((c.x + ex - x0) / CELL));
+      const j0 = Math.max(0, Math.floor((c.z - ez - z0) / CELL)), j1 = Math.min(nz - 1, Math.floor((c.z + ez - z0) / CELL));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const dx = x0 + (i + 0.5) * CELL - c.x, dz = z0 + (j + 0.5) * CELL - c.z;
+        const lx = dx * cr - dz * sr, lz = dx * sr + dz * cr;      // into the rectangle's frame, as main.js's obbPush
+        const d = Math.hypot(Math.max(0, Math.abs(lx) - c.hw), Math.max(0, Math.abs(lz) - c.hd)), k = j * nx + i;
+        if (d < clr[k]) clr[k] = d;
+      }
+    }
+    return { x0, z0, nx, nz, clr };
+  }
+  // the way from (sx, sz) to within reach of (tx, tz): corner points to walk through, the last one in reach
+  // (ok) or, when nothing in reach can be got to, as near as the floor allows
+  function plan(sx, sz, tx, tz, reach) {
+    const { x0, z0, nx, nz, clr } = floorGrid(), N = nx * nz;
+    const cell = (x, z) => Math.max(0, Math.min(nz - 1, Math.floor((z - z0) / CELL))) * nx + Math.max(0, Math.min(nx - 1, Math.floor((x - x0) / CELL)));
+    const cx = (k) => x0 + (k % nx + 0.5) * CELL, cz = (k) => z0 + (Math.floor(k / nx) + 0.5) * CELL;
+    const at = (x, z) => clr[cell(x, z)];
+    // where you stand is open, and so is the floor right round you: you may be brushing a chair
+    const open = (k) => clr[k] >= CLEAR || (clr[k] > 0.05 && Math.hypot(cx(k) - sx, cz(k) - sz) < 0.6);
+    const cost = (k) => 1 + 2.5 * Math.max(0, (0.6 - clr[k]) / 0.31);
+    const dist = (k) => Math.hypot(cx(k) - tx, cz(k) - tz);
+    const sees = (k) => {                       // once the line to the target enters something, it stays in it
+      const ax = cx(k), az = cz(k), n = Math.ceil(Math.hypot(tx - ax, tz - az) / (CELL / 2));
+      let inside = false;
+      for (let s = 1; s <= n; s++) { const c = at(ax + (tx - ax) * s / n, az + (tz - az) * s / n) < 0.02; if (inside && !c) return false; inside = c; }
+      return true;
+    };
+    const g = new Float32Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), done = new Uint8Array(N);
+    const hf = [], hk = [];                     // a binary heap of cells by estimated total cost
+    const push = (f, k) => {
+      let i = hf.length; hf.push(f); hk.push(k);
+      while (i > 0) { const p = (i - 1) >> 1; if (hf[p] <= f) break; hf[i] = hf[p]; hk[i] = hk[p]; i = p; }
+      hf[i] = f; hk[i] = k;
+    };
+    const pop = () => {
+      const top = hk[0], f = hf.pop(), k = hk.pop(), n = hf.length;
+      if (n) {
+        let i = 0;
+        for (;;) { const l = 2 * i + 1, r = l + 1; let m = l < n && hf[l] < f ? l : -1; if (r < n && hf[r] < (m < 0 ? f : hf[l])) m = r; if (m < 0) break; hf[i] = hf[m]; hk[i] = hk[m]; i = m; }
+        hf[i] = f; hk[i] = k;
+      }
+      return top;
+    };
+    const start = cell(sx, sz);
+    g[start] = 0; push(Math.max(0, dist(start) - reach), start);
+    let end = -1, near = start, nearD = Infinity;
+    while (hf.length) {
+      const k = pop(); if (done[k]) continue; done[k] = 1;
+      const d = dist(k);
+      if (d <= reach && sees(k)) { end = k; break; }
+      if (d < nearD) { nearD = d; near = k; }
+      const i = k % nx, j = Math.floor(k / nx);
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = i + di, jj = j + dj, n = jj * nx + ii;
+        if ((!di && !dj) || ii < 0 || jj < 0 || ii >= nx || jj >= nz || done[n] || !open(n)) continue;
+        if (di && dj && (!open(j * nx + ii) || !open(jj * nx + i))) continue;       // no cutting a corner
+        const gn = g[k] + (di && dj ? Math.SQRT2 : 1) * CELL * (cost(k) + cost(n)) / 2;
+        if (gn < g[n]) { g[n] = gn; from[n] = k; push(gn + Math.max(0, dist(n) - reach), n); }
+      }
+    }
+    const ok = end >= 0;
+    if (!ok) end = near;
+    const cells = [];
+    for (let k = end; k >= 0; k = from[k]) cells.push(k);
+    cells.reverse();
+    // pull it straight: from each corner, on to the farthest cell in plain view with room to pass (as much
+    // room as the cells between had, up to a comfortable margin)
+    const clear = (ax, az, bx, bz, need) => {
+      const n = Math.ceil(Math.hypot(bx - ax, bz - az) / (CELL / 2));
+      for (let s = 1; s < n; s++) if (at(ax + (bx - ax) * s / n, az + (bz - az) * s / n) < need) return false;
+      return true;
+    };
+    const pts = [];
+    let ax = sx, az = sz, low = Infinity;
+    for (let b = 1; b < cells.length; b++) {
+      low = Math.min(low, clr[cells[b]]);
+      if (!clear(ax, az, cx(cells[b]), cz(cells[b]), Math.min(ROOMY, low))) {
+        const c = cells[b - 1];
+        if (Math.hypot(cx(c) - ax, cz(c) - az) > 0.05) pts.push({ x: cx(c), z: cz(c) });
+        ax = cx(c); az = cz(c); low = Math.min(clr[c], clr[cells[b]]);
+      }
+    }
+    if (cells.length > 1) pts.push({ x: cx(end), z: cz(end) });
+    return { pts, ok };
   }
   function clampCam(x, y, z) {
     const p = walk(x, z, 0.25);
@@ -1960,7 +2058,7 @@ const RR_WORLD = (() => {
 
   return {
     setOwn, setLit,
-    init, ROOM, CATALOG, SECTIONS, SEC, EXHIBITS, walk, footprintOK, route, clampCam, areaOf, setDoors, doorsOpen, spawn, place, despawn, layoutBooks, setRibbons, pick, highlight, rowBox, spotBox, colliders, seatList, tick, bookDims,
+    init, ROOM, CATALOG, SECTIONS, SEC, EXHIBITS, walk, footprintOK, plan, clampCam, setDoors, doorsOpen, spawn, place, despawn, layoutBooks, setRibbons, pick, highlight, rowBox, spotBox, colliders, seatList, tick, bookDims,
     bookMesh: (id) => (bookObj.get(id) || {}).mesh, bookInfo: (id) => bookObj.get(id), rowInfo: (id) => rows.get(id), furnInfo: (id) => furn.get(id),
     rows, furn, M, G, get scene() { return scene; },
     caseHits, fixedColliders   // fixtures other scripts add (cinema.js): pickable meshes, and footprints you walk round

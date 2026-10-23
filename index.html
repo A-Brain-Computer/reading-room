@@ -55,6 +55,19 @@ button{cursor:pointer}
 #tools{position:fixed;z-index:30;right:calc(var(--sar) + 12px);top:calc(var(--sat) + 10px);display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 120px)}
 body:not(.playing) #tools,body.reading #tools,body.reading #home,body.reading #bar,body.reading #chat{display:none}
 @media (max-width:640px){ #tools .lbl{display:none} #tools{gap:5px} #tools .chip{padding:8px 9px} #home .lbl{display:none} }
+/* the speaker chip's menu: each sound on or off, for you alone */
+#sndMenu{position:absolute;top:calc(100% + 8px);right:0;width:min(280px,calc(100vw - 24px));background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:0 14px 40px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:2px}
+#sndH{margin:6px 10px 4px;font:700 12px/1.2 Georgia,serif;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+#sndH small{font:italic 400 12px/1.2 Georgia,serif;letter-spacing:0;text-transform:none;margin-left:4px}
+.srow{appearance:none;border:0;background:none;display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:8px 10px;border-radius:10px;color:var(--ink);min-height:48px}
+.srow:hover,.srow:focus-visible{background:rgba(232,176,75,.1);outline:none}
+.srow .st{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.srow b{font-weight:600;font-size:14px}
+.srow small{font-size:12px;color:var(--dim)}
+.srow .tog{flex:none;width:38px;height:22px;border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.35);position:relative;transition:background .15s,border-color .15s}
+.srow .tog::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--dim);transition:transform .15s,background .15s}
+.srow[aria-checked="true"] .tog{background:rgba(232,176,75,.3);border-color:var(--gold)}
+.srow[aria-checked="true"] .tog::after{transform:translateX(16px);background:var(--gold)}
 
 /* ---------- title ---------- */
 #title{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;
@@ -265,8 +278,9 @@ body.arranging #arrange{display:flex}
   <button class="chip" id="bInv" type="button" title="Invite friends to read with you"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 17c0-3 2.5-5 5-5s5 2 5 5M14 6v6M11 9h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="lbl" id="bInvL">Invite</span></button>
   <button class="chip" id="bView" type="button" aria-pressed="false" title="First or third person (V)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="10" r="2.4" fill="currentColor"/></svg><span class="lbl">View</span></button>
   <button class="chip" id="bZoom" type="button" aria-pressed="false" title="Zoom in on the shelves (wheel, pinch, + / −, Z)"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.2 12.2L17 17M6.3 8.5h4.4M8.5 6.3v4.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="lbl" id="bZoomL">Zoom</span></button>
-  <button class="chip" id="bSnd" type="button" aria-pressed="false" title="Sound"><svg viewBox="0 0 20 20" aria-hidden="true"><path id="sndIcon" d="M3 8h3l4-3v10l-4-3H3z M13 7a4 4 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></button>
+  <button class="chip" id="bSnd" type="button" aria-expanded="false" aria-controls="sndMenu" title="Sound: the fire, footsteps and books, the film"><svg viewBox="0 0 20 20" aria-hidden="true"><path id="sndIcon" d="M3 8h3l4-3v10l-4-3H3z M13 7a4 4 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></button>
   <button class="chip" id="bHelp" type="button" title="Controls">?</button>
+  <div id="sndMenu" role="group" aria-labelledby="sndH" hidden><p id="sndH">Sound <small>just for you</small></p></div>
 </div>
 
 <div id="cross"></div>
@@ -337,13 +351,14 @@ body.arranging #arrange{display:flex}
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="helpH">
     <header><h2 id="helpH">How the room works</h2><button class="x" type="button" data-close aria-label="Close">✕</button></header>
     <div class="body muted">
-      <p><b style="color:var(--gold2)">Walk</b> with WASD or the arrow keys (Shift to hurry), or your left thumb on a phone. <b style="color:var(--gold2)">Look</b> by dragging. Click or tap the floor to walk there.</p>
+      <p><b style="color:var(--gold2)">Walk</b> with WASD or the arrow keys (Shift to hurry), or your left thumb on a phone. <b style="color:var(--gold2)">Look</b> by dragging. Click or tap the floor, a book or a chair and you walk there, round whatever is in the way.</p>
       <p><b style="color:var(--gold2)">Look closer.</b> Scroll the wheel, pinch the trackpad or the screen, or press <b>+</b> / <b>−</b> to zoom in on the shelves and read the spines; <b>Z</b> or the magnifier steps through 1×, 2.5× and 6×, and Esc zooms back out. Zoomed in, the title of the book you aim at shows at the bottom of the screen.</p>
       <p><b style="color:var(--gold2)">Books.</b> The east wall is the golden wall: gilt shelves backed in oxblood, under brass lights. The narratives stand at its heart, with the WPA interviews above them, lit, and a gilt runner leading to them: begin there; to one side are Africa and the diaspora and the radical tradition, to the other the speeches and essays and the historians. The fiction, the poets and the witnesses stand in gilt beside the fire, with scripture and the spirit; useful knowledge and natural history are on the south wall; the great books of the world, in leather with dark title labels, fill the Great Hall. The books of the person you read as glow for you. The plain old volumes are the room's own. Click a book to take it down; you carry one at a time. Click an open shelf to put it there, or a table to start a pile. Piles stay where you leave them.</p>
       <p><b style="color:var(--gold2)">The Great Hall.</b> The double doors on the south wall, across from the fire, open when you finish your first chapter. Behind them is a domed hall with a card catalog at its centre, and shelves for the library to grow into. Off its east side, the Banned Books gallery opens when you finish your first whole book (some are short). A chapter is finished when you reach its last page. Once open, the doors stay open for everyone in the room: in the shared library anyone's reading opens them, and in a friend's room the host's.</p>
       <p><b style="color:var(--gold2)">Read.</b> Sit in any chair, sofa, stool or window seat while holding a book and it opens. Or press <b>R</b> to read standing up. Your place in every book is kept. The speaker button in the reader reads the book aloud to you.</p>
       <p><b style="color:var(--gold2)">Notes in the margin.</b> In the reader, select a few words (or tap a paragraph) and choose <i>Note</i>. Your notes stay with the book; in a shared room, friends see them too.</p>
       <p><b style="color:var(--gold2)">The cinema.</b> Pull the cord by the fire and a screen comes down over the mantel; the projector behind the sofa rises to show race films and early Black cinema, all in the public domain. Click the projector to choose a film, or paste a direct .mp4 or .webm link, or a YouTube link (which plays in a window). In a shared room everyone sees the same film. Click the screen to watch it up close, in a window, where the player's own buttons pause it for the room; to watch it filling your own screen, press <b>G</b> or the full-screen button; <b>M</b> or the speaker button mutes it for you alone. Esc closes the window.</p>
+      <p><b style="color:var(--gold2)">Sound.</b> The speaker button at the top opens the room's sounds, each on or off for you alone: the fire, footsteps and books, and the film. Turn off the fire and the film keeps its sound.</p>
       <p><b style="color:var(--gold2)">Rearrange.</b> Press Tab (or <i>Arrange</i>) to move furniture, turn it with Q and E, add new pieces or put them away. Bookcases you add come with empty shelves for your own sections.</p>
       <p><b style="color:var(--gold2)">Read together.</b> <i>Invite</i> makes a link. Friends who open it walk into your room as their reader, see what you're reading and can talk in the room. On the shared claude.ai page there is no link to send: everyone who opens the page walks into one shared library (up to six at a time is comfortable), and books and furniture stay where you all leave them.</p>
       <p>The texts are U.S. public domain, from the Project Gutenberg editions; see <a href="SOURCES.md" style="color:var(--gold)">SOURCES.md</a>.</p>

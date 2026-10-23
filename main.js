@@ -41,7 +41,7 @@
   let toastT = 0;
   function toast(msg, ms) { const el = $('#toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), ms || 2400); }
   const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  function openSheet(id) { closeSheets(); const el = $('#' + id); el.hidden = false; S.sheet = id; const f = el.querySelector('input,button.x'); if (f && !touch) setTimeout(() => f.focus(), 30); }
+  function openSheet(id) { closeSheets(); soundMenu(false); const el = $('#' + id); el.hidden = false; S.sheet = id; const f = el.querySelector('input,button.x'); if (f && !touch) setTimeout(() => f.focus(), 30); }
   function closeSheets() { document.querySelectorAll('.sheet').forEach(s => { s.hidden = true; }); S.sheet = null; }
   document.querySelectorAll('.sheet').forEach(s => {
     s.addEventListener('click', (e) => { if (e.target === s || e.target.hasAttribute('data-close')) closeSheets(); });
@@ -408,6 +408,7 @@
   function typing() { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'); }
   window.addEventListener('keydown', (e) => {
     if (S.mode === 'reader' || typing()) return;
+    if (e.key === 'Escape' && !$('#sndMenu').hidden) { soundMenu(false); $('#bSnd').focus(); return; }
     if (S.sheet) {
       if (e.key === 'Escape') closeSheets();
       else if (S.sheet === 'cineView' && CN) { const k2 = e.key.toLowerCase(); if (k2 === 'm') CN.toggleMute(); else if (k2 === 'g') CN.fullscreen(); }
@@ -814,7 +815,7 @@
   const READ = () => (listens() ? 'Listen' : 'Read');
   function readNow(id) {
     const b = S.byId.get(id); if (!b) return;
-    S.mode = 'reader';
+    S.mode = 'reader'; soundMenu(false);
     W && S.gl && W.highlight(null);
     relayout();
     RD.open(b, { listen: listens() });
@@ -981,13 +982,19 @@
       wantX = (-sy * inp.fz + cy * inp.fx) * sp; wantZ = (-cy * inp.fz - sy * inp.fx) * sp;
     } else if (P.walkTo && !P.seat) {
       const w = P.walkTo; w.t += dt;
-      if (!w.via) w.via = W.route(P.x, P.z, w.x, w.z);             // doorways on the way, if it's in another hall
+      if (!w.via) {                                                 // the way there, round whatever is in the way
+        const p = W.plan(P.x, P.z, w.x, w.z, w.reach);
+        w.via = p.pts;
+        if (!p.ok && (w.near || !w.then) && w.via.length) { const e = w.via[w.via.length - 1]; w.x = e.x; w.z = e.z; }   // a spot nobody can stand on: as near as the floor allows
+      }
       const tgt = w.via.length ? w.via[0] : w;
       const dx = tgt.x - P.x, dz = tgt.z - P.z, d = Math.hypot(dx, dz);
-      if (w.via.length && d < 0.45) { w.via.shift(); w.t = 0; }
-      else if (!w.via.length && d <= w.reach) { P.walkTo = null; if (w.then) w.then(); }
+      if (w.via.length <= 1 && Math.hypot(w.x - P.x, w.z - P.z) <= w.reach) { P.walkTo = null; if (w.then) w.then(); }
+      else if (w.via.length && d < (w.via.length > 1 ? 0.22 : 0.12)) { w.via.shift(); w.t = 0; }
       else {
-        const sp = Math.min(2.4, 1 + d);
+        let left = d;                                               // what's left of the walk, to slow down at the end only
+        for (let i = 1; i < w.via.length; i++) left += Math.hypot(w.via[i].x - w.via[i - 1].x, w.via[i].z - w.via[i - 1].z);
+        const sp = Math.min(2.4, 1 + left);
         let ux = dx / d, uz = dz / d;
         if (w.detour && w.detour.t > 0) { w.detour.t -= dt; const sx = -uz * w.detour.side, sz = ux * w.detour.side; ux = sx * 0.85 + ux * 0.3; uz = sz * 0.85 + uz * 0.3; const m = Math.hypot(ux, uz); ux /= m; uz /= m; }
         wantX = ux * sp; wantZ = uz * sp;
@@ -1011,7 +1018,8 @@
         if (P.stuck > 0.5) {
           const w = P.walkTo; P.stuck = 0;
           if (w.then && Math.hypot(w.x - P.x, w.z - P.z) < REACH + 0.4) { P.walkTo = null; w.then(); }
-          else if ((w.tries = (w.tries || 0) + 1) <= 5) w.detour = { t: 0.6 + w.tries * 0.15, side: w.tries % 2 ? 1 : -1 };
+          else if ((w.replans = (w.replans || 0) + 1) <= 2) { w.via = null; w.detour = null; }   // something moved: find the way again from here
+          else if ((w.tries = (w.tries || 0) + 1) <= 4) w.detour = { t: 0.6 + w.tries * 0.15, side: w.tries % 2 ? 1 : -1 };
           else { P.walkTo = null; toast('Something is in the way. Walk a little closer and try again.'); }
         }
       }
@@ -1338,23 +1346,61 @@
     // walk to a spot in front of it, then face it
     const n = new T.Vector3(0, 0, 1).applyQuaternion(m.parent.getWorldQuaternion(new T.Quaternion()));
     const tx = wp.x + n.x * 1.1, tz = wp.z + n.z * 1.1;
-    P.walkTo = { x: tx, z: tz, reach: 0.3, t: 0, then: () => { P.yaw = Math.atan2(-(wp.x - P.x), -(wp.z - P.z)); P.pitch = Math.atan2(wp.y - P.eye, Math.hypot(wp.x - P.x, wp.z - P.z)) * 0.9; } };
+    P.walkTo = { x: tx, z: tz, reach: 0.3, near: true, t: 0, then: () => { P.yaw = Math.atan2(-(wp.x - P.x), -(wp.z - P.z)); P.pitch = Math.atan2(wp.y - P.eye, Math.hypot(wp.x - P.x, wp.z - P.z)) * 0.9; } };
     toast(S.byId.get(id).short + ' — ' + whereIs(id) + '.', 3000);
   }
 
-  /* ---------------- sound: a small procedural room ---------------- */
-  let AC = null, master = null, fireG = null, muted = A && A.mute ? A.mute.get() : !!store.load('muted', false, true);
-  function paintMute() {
-    $('#bSnd').setAttribute('aria-pressed', muted ? 'true' : 'false');
-    $('#sndIcon').setAttribute('d', muted ? 'M3 8h3l4-3v10l-4-3H3z M12.5 7.5l4 5 M16.5 7.5l-4 5' : 'M3 8h3l4-3v10l-4-3H3z M13 7a4 4 0 0 1 0 6');
-    if (master) master.gain.value = muted ? 0 : 0.8;
+  /* ---------------- sound: a small procedural room ----------------
+     What you hear, each part yours to turn off from the speaker chip's menu: the fire, the room's own sounds
+     (footsteps, books, doors, pages) and the film, whose sound cinema.js keeps (M). Music, when it comes, is
+     one more entry in SOUNDS with a bus of its own. */
+  const SOUNDS = [
+    { id: 'fire', label: 'The fire', note: 'crackling in the hearth' },
+    { id: 'room', label: 'Footsteps and books', note: 'steps, pages, doors' },
+    { id: 'film', label: 'The film', note: touch ? 'only for you' : 'only for you (M)' }
+  ];
+  const saved = store.load('sound', null, true);
+  const snd = Object.assign({ fire: true, room: true }, saved || {});
+  if (A && A.mute ? A.mute.get() : !saved && store.load('muted', false, true)) snd.fire = snd.room = false;   // muted across the arcade, or before the room had its own switches
+  let AC = null, master = null, fireG = null, roomG = null;
+  const soundOn = (id) => id === 'film' ? !!(CN && !CN.muted()) : !!snd[id];
+  function paintSound() {
+    const any = SOUNDS.some(s => soundOn(s.id));
+    $('#sndIcon').setAttribute('d', any ? 'M3 8h3l4-3v10l-4-3H3z M13 7a4 4 0 0 1 0 6' : 'M3 8h3l4-3v10l-4-3H3z M12.5 7.5l4 5 M16.5 7.5l-4 5');
+    document.querySelectorAll('#sndMenu .srow').forEach(b => b.setAttribute('aria-checked', String(soundOn(b.dataset.snd))));
+    if (roomG) roomG.gain.value = snd.room ? 1 : 0;
+  }
+  function setSound(id, on) {
+    if (id === 'film') { if (CN) CN.setMuted(!on); }
+    else {
+      snd[id] = !!on; store.save('sound', { fire: snd.fire, room: snd.room }, true);
+      if (A && A.mute && A.mute.get() !== (!snd.fire && !snd.room)) A.mute.set(!snd.fire && !snd.room);   // all of it off here is off across the arcade
+      if (on) resumeAudio(); else if (AC && !snd.fire && !snd.room) AC.suspend();   // nothing left to hear: let the device rest
+    }
+    paintSound(); updateAudio();
+  }
+  function buildSoundMenu() {
+    const box = $('#sndMenu');
+    SOUNDS.filter(s => s.id !== 'film' || CN).forEach(s => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'srow'; b.setAttribute('role', 'switch'); b.dataset.snd = s.id;
+      b.innerHTML = `<span class="st"><b>${esc(s.label)}</b><small>${esc(s.note)}</small></span><i class="tog" aria-hidden="true"></i>`;
+      b.onclick = () => setSound(s.id, !soundOn(s.id));
+      box.appendChild(b);
+    });
+  }
+  function soundMenu(open) {
+    const m = $('#sndMenu'), want = open == null ? m.hidden : open;
+    m.hidden = !want; $('#bSnd').setAttribute('aria-expanded', String(want));
+    if (want) { paintSound(); const f = m.querySelector('.srow'); if (f && !touch) f.focus(); }
   }
   function resumeAudio() {
-    if (muted) return;
+    if (!snd.fire && !snd.room) return;
     try {
       if (!AC) {
         AC = new (window.AudioContext || window.webkitAudioContext)();
         master = AC.createGain(); master.gain.value = 0.8; master.connect(AC.destination);
+        roomG = AC.createGain(); roomG.gain.value = snd.room ? 1 : 0; roomG.connect(master);
         // the fire: noise through a low band, with crackles
         const len = AC.sampleRate * 2, buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0);
         let b = 0; for (let i = 0; i < len; i++) { b = b * 0.97 + (Math.random() * 2 - 1) * 0.03; d[i] = b * 3 + (Math.random() < 0.0009 ? (Math.random() * 2 - 1) * 0.9 : 0); }
@@ -1367,15 +1413,15 @@
     } catch (e) { AC = null; }
   }
   function blip(type) {
-    if (!AC || muted) return;
+    if (!AC || !snd.room) return;
     const t = AC.currentTime;
     const noise = (dur, f, q, vol, decay) => {
       const n = AC.createBufferSource(), len = Math.ceil(AC.sampleRate * dur), buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay || 2);
       n.buffer = buf; const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
-      const g = AC.createGain(); g.gain.value = vol; n.connect(bp); bp.connect(g); g.connect(master); n.start(t);
+      const g = AC.createGain(); g.gain.value = vol; n.connect(bp); bp.connect(g); g.connect(roomG); n.start(t);
     };
-    const thump = (f, vol, dur) => { const o = AC.createOscillator(), g = AC.createGain(); o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.5, t + dur); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g); g.connect(master); o.start(t); o.stop(t + dur); };
+    const thump = (f, vol, dur) => { const o = AC.createOscillator(), g = AC.createGain(); o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.5, t + dur); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); o.connect(g); g.connect(roomG); o.start(t); o.stop(t + dur); };
     if (type === 'take' || type === 'swap') { noise(0.18, 2400, 0.8, 0.25, 3); thump(160, 0.15, 0.12); }
     else if (type === 'shelve' || type === 'pile') { thump(120, 0.3, 0.16); noise(0.08, 1800, 1, 0.15, 4); }
     else if (type === 'sit') { noise(0.35, 300, 0.6, 0.35, 1.5); thump(80, 0.2, 0.25); }
@@ -1386,7 +1432,7 @@
     else if (type === 'door') { thump(60, 0.35, 0.4); noise(0.4, 900, 0.5, 0.1, 2); }
     else if (type === 'unlock') {                      // heavy doors swinging, and a bell
       thump(55, 0.4, 0.6); noise(1.2, 700, 0.4, 0.12, 1.2);
-      [660, 990].forEach((f, i) => { const o = AC.createOscillator(), g = AC.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t + 0.3 + i * 0.25); g.gain.exponentialRampToValueAtTime(0.12, t + 0.32 + i * 0.25); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2 + i * 0.25); o.connect(g); g.connect(master); o.start(t + 0.3 + i * 0.25); o.stop(t + 2.4 + i * 0.25); });
+      [660, 990].forEach((f, i) => { const o = AC.createOscillator(), g = AC.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t + 0.3 + i * 0.25); g.gain.exponentialRampToValueAtTime(0.12, t + 0.32 + i * 0.25); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2 + i * 0.25); o.connect(g); g.connect(roomG); o.start(t + 0.3 + i * 0.25); o.stop(t + 2.4 + i * 0.25); });
     }
     else if (type === 'page') { noise(0.24, 3200, 0.45, 0.16, 1.3); noise(0.1, 1200, 0.8, 0.06, 3); }
   }
@@ -1396,14 +1442,15 @@
   function updateAudio() {
     if (!fireG || !AC) return;
     const d = Math.hypot(P.x - 0, P.z - (W.ROOM.z0 + 1));
-    fireG.gain.setTargetAtTime(muted || S.mode === 'title' ? 0 : 0.5 / (1 + d * 0.35), AC.currentTime, 0.4);
+    fireG.gain.setTargetAtTime(!snd.fire || S.mode === 'title' ? 0 : 0.5 / (1 + d * 0.35), AC.currentTime, 0.4);
   }
-  $('#bSnd').onclick = () => {
-    if (A && A.mute) muted = A.mute.toggle(); else { muted = !muted; store.save('muted', muted, true); }
-    if (!muted) resumeAudio();
-    paintMute(); toast(muted ? 'Sound off.' : 'Sound on.', 1200);
-  };
-  if (A && A.mute) A.mute.on((v) => { muted = v; paintMute(); });
+  buildSoundMenu();
+  $('#bSnd').onclick = (e) => { e.stopPropagation(); soundMenu(); };
+  document.addEventListener('pointerdown', (e) => {               // a click away closes it; one in the room only closes it
+    if ($('#sndMenu').hidden || e.target.closest('#sndMenu,#bSnd')) return;
+    soundMenu(false);
+    if (e.target === cvs) { e.stopPropagation(); e.preventDefault(); }
+  }, true);
   RD && RD.setSound && RD.setSound((t) => blip(t));
 
   /* ---------------- title screen ---------------- */
@@ -1516,7 +1563,7 @@
     fpHolder = new T.Group(); fpHolder.userData.hand = true;
     fpHolder.position.set(0.24, -0.25, -0.52); fpHolder.rotation.set(0.25, -1.2, 0.08);
     camera.add(fpHolder);
-    if (CN) CN.init({ scene, camera, renderer, W, doOp, openSheet, closeSheets, toast, shared: () => S.shared, host: () => !S.shared || S.isHost });
+    if (CN) CN.init({ scene, camera, renderer, W, doOp, openSheet, closeSheets, toast, shared: () => S.shared, host: () => !S.shared || S.isHost, soundChanged: () => paintSound() });
     // your room
     S.room = sanitizeRoom(store.load('room', null)) || defaultRoom();
     syncFurniture();
@@ -1532,7 +1579,7 @@
       NET.init(app);
       NET.detect().then(ok => { S.canCommons = ok; document.body.classList.toggle('can-commons', ok); if (ok && !QS.get('room') && S.mode === 'title') $('#go').textContent = 'Walk into the shared library'; });
     }
-    paintMute();
+    paintSound();
     S.ready = true;
     msg('');
     requestAnimationFrame(frame);
@@ -1573,6 +1620,6 @@
   $('#bHelp').onclick = () => openSheet('help');
 
   // a small window for tests and the console: read-only views plus a couple of helpers
-  window.RR = { S, P, store, sim: (n, dt) => { for (let i = 0; i < n; i++) step(dt || 0.05); updateCamera(0.016, clock); return { x: +P.x.toFixed(2), z: +P.z.toFixed(2), walking: !!P.walkTo }; }, tapAt: (x, y) => tapAt(x, y), screenOf: (id) => { const m = W.bookMesh(id); if (!m || !m.parent) return null; const v = new T.Vector3(); m.getWorldPosition(v); v.project(camera); return { x: Math.round((v.x * 0.5 + 0.5) * innerWidth), y: Math.round((-v.y * 0.5 + 0.5) * innerHeight) }; }, pickAt: (x, y) => { const t = resolve(W.pick(aimFrom(x, y), 'play', 40)); return t && { kind: t.kind, id: t.id, row: t.row, f: t.f, s: t.s, dist: +(t.dist || 0).toFixed(2), acts: actsFor(t).map(a => a.label) }; }, applyOp, locate, defaultRoom, doOp, sit, standUp, readNow, toggleArrange, spawnNew, openCatalog, findBook, enter, checkDoors, unlock: (door) => doOp({ t: 'unlock', door }), stats: () => RD.stats(), W, Z, zoom: (v) => { zoomTo(v); Z.level = Z.target; updateCamera(0.016, clock); return Z.level; }, frameOnce: () => { updateCamera(0.016, clock); renderer.render(scene, camera); const i = renderer.info.render; return { calls: i.calls, tris: i.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, progs: renderer.info.programs.length }; } };
+  window.RR = { S, P, store, sim: (n, dt) => { for (let i = 0; i < n; i++) step(dt || 0.05); updateCamera(0.016, clock); return { x: +P.x.toFixed(2), z: +P.z.toFixed(2), walking: !!P.walkTo }; }, tapAt: (x, y) => tapAt(x, y), screenOf: (id) => { const m = W.bookMesh(id); if (!m || !m.parent) return null; const v = new T.Vector3(); m.getWorldPosition(v); v.project(camera); return { x: Math.round((v.x * 0.5 + 0.5) * innerWidth), y: Math.round((-v.y * 0.5 + 0.5) * innerHeight) }; }, pickAt: (x, y) => { const t = resolve(W.pick(aimFrom(x, y), 'play', 40)); return t && { kind: t.kind, id: t.id, row: t.row, f: t.f, s: t.s, dist: +(t.dist || 0).toFixed(2), acts: actsFor(t).map(a => a.label) }; }, applyOp, locate, defaultRoom, doOp, sit, standUp, readNow, toggleArrange, spawnNew, openCatalog, findBook, enter, checkDoors, unlock: (door) => doOp({ t: 'unlock', door }), stats: () => RD.stats(), W, Z, sound: () => ({ fire: snd.fire, room: snd.room, film: soundOn('film'), ac: AC ? AC.state : null, fireGain: fireG ? +fireG.gain.value.toFixed(3) : null, roomGain: roomG ? +roomG.gain.value.toFixed(3) : null }), setSound, soundMenu, zoom: (v) => { zoomTo(v); Z.level = Z.target; updateCamera(0.016, clock); return Z.level; }, frameOnce: () => { updateCamera(0.016, clock); renderer.render(scene, camera); const i = renderer.info.render; return { calls: i.calls, tris: i.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, progs: renderer.info.programs.length }; } };
   boot();
 })();

@@ -26,7 +26,7 @@
    the <video> itself sits over the canvas, warped in perspective onto the screen every frame.
 
    API (main.js): init(ctx), sanitize(screen), applyOp(room, op), sync(room), acts(t), label(t), open(),
-   fullscreen(), toggleMute(), hasFilm(), afterRender() */
+   fullscreen(), toggleMute(), setMuted(m), muted(), hasFilm(), afterRender(); ctx.soundChanged() hears your mute change */
 'use strict';
 const RR_CINEMA = (() => {
   if (!window.THREE) return null;
@@ -713,7 +713,7 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
     mark('play');
     const p = video.play();
     if (p && p.catch) p.catch((err) => {
-      if (err && err.name === 'NotAllowedError' && !video.muted) { sysAt = now(); video.muted = true; F.muted = true; paint(); mark('play'); video.play().catch(() => {}); }
+      if (err && err.name === 'NotAllowedError' && !video.muted) { sysAt = now(); video.muted = true; F.muted = true; paint(); if (ctx.soundChanged) ctx.soundChanged(); mark('play'); video.play().catch(() => {}); }
     });
   }
 
@@ -726,6 +726,7 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
     if (Y) { Y.muted = muted; ytCmd(muted ? 'mute' : 'unMute'); }
     if (!muted && cur && cur.playing && F && F.kind === 'file' && video && video.paused) drive(true);   // held back until a click
     paint();
+    if (ctx && ctx.soundChanged) ctx.soundChanged();               // the room's sound menu shows it too
   }
   function toggleMute() {
     if (!cur || !cur.src) return false;
@@ -850,7 +851,7 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
         Y.time = info.currentTime; Y.timeAt = t;
       }
       if (typeof info.duration === 'number' && info.duration > 0) { Y.dur = info.duration; F.dur = info.duration; }
-      if (typeof info.muted === 'boolean' && info.muted !== Y.muted) { Y.muted = info.muted; paint(); }
+      if (typeof info.muted === 'boolean' && info.muted !== Y.muted) { Y.muted = info.muted; paint(); if (ctx.soundChanged) ctx.soundChanged(); }
       if (info.videoData && info.videoData.title && F.mine && cur && cur.title === 'A YouTube video') setScreen({ title: clip(info.videoData.title, 120) });
       if (typeof info.playerState === 'number') ytState(info.playerState);
     }
@@ -1218,5 +1219,5 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
   function state() { return { beam: O.beam && { on: O.beam.visible, verts: O.beam.geometry.attributes.position ? O.beam.geometry.attributes.position.count : 0, uO: O.beamMat.uniforms.uO.value }, cur, mode: F && F.mode, kind: F && F.kind, frame: F && F.frame, dur: F && F.dur, watching, viewOpen, url: F && F.url, time: localTime(), k: A.k, lift: A.lift, lamp: A.lamp, dim: A.dim, exposure: ctx && ctx.renderer.toneMappingExposure, video: !!video, paused: video ? video.paused : null, muted: effMuted(), elMuted: video ? video.muted : null, full: fullVid, blind: !!(F && F.blind), texAt, relay: relayC ? relayC.width + 'x' + relayC.height : null, over: !!O.overOn, overVisible: !!(video && video.parentNode && video.parentNode.id === 'cineOver' && +video.style.opacity > 0.05), overTransform: video && video.parentNode && video.parentNode.id === 'cineOver' ? video.style.transform.slice(0, 40) : null, apple: APPLE }; }
 
   const hasFilm = () => !!(cur && cur.src);
-  return { FILMS, init, sanitize, applyOp, sync, acts, label, open, settle, state, ytId, pickables, fullscreen, toggleMute, hasFilm, afterRender };
+  return { FILMS, init, sanitize, applyOp, sync, acts, label, open, settle, state, ytId, pickables, fullscreen, toggleMute, setMuted, muted: effMuted, hasFilm, afterRender };
 })();
