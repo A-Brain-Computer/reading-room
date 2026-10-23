@@ -193,7 +193,11 @@ const RR_READER = (() => {
   }
   function next() {
     if (!cur || !cur.data) return;
-    if (cur.page < cur.pages - 1) { turnTo(cur.page + 1); sound('page'); return; }
+    if (cur.page < cur.pages - 1) {
+      turnTo(cur.page + 1); sound('page');
+      if (cur.page === cur.pages - 1) finishChapter(cur.ch);   // its last page: read, even if you close the book here
+      return;
+    }
     finishChapter(cur.ch);
     if (cur.ch < cur.data.chapters.length - 1) { show(cur.ch + 1, { page: 0 }); sound('page'); }
   }

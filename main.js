@@ -657,11 +657,12 @@
       return out;
     }
     if (t.kind === 'door') {
-      const st = RD.stats(), guest = S.shared && !S.isHost;
-      if (t.door === 'hall') t.label = 'The doors to the Great Hall. ' + (guest ? 'They open as the host of this room reads.' : 'They open when you finish your first chapter.');
+      // in a friend's room the host's reading opens them; in the shared library anyone's does, for everyone
+      const st = RD.stats(), guest = S.shared && !S.isHost && !S.commons, all = S.commons ? ', for everyone, when anyone here finishes' : ' when you finish';
+      if (t.door === 'hall') t.label = 'The doors to the Great Hall. ' + (guest ? 'They open as the host of this room reads.' : 'They open' + all + (S.commons ? ' a chapter.' : ' your first chapter.'));
       else {
         const short = S.books.filter(b => b.words).sort((a, b) => a.words - b.words).slice(0, 2).map(b => '<i>' + esc(b.short) + '</i>');
-        t.label = 'The doors to the Banned Books gallery. ' + (guest ? 'They open as the host of this room reads.' : 'They open when you finish a whole book' + (st.books ? '.' : ' — some are short, like ' + short.join(' or ') + '.'));
+        t.label = 'The doors to the Banned Books gallery. ' + (guest ? 'They open as the host of this room reads.' : 'They open' + all + ' a whole book' + (st.books ? '.' : ' — some are short, like ' + short.join(' or ') + '.'));
       }
       out.push({ label: 'Find something to read', key: 'E', fn: () => openCatalog() });
       return out;
@@ -819,7 +820,8 @@
     RD.open(b, { listen: listens() });
   }
   // the doors open as you read: the Great Hall after your first chapter, the Banned Books gallery after
-  // your first whole book. They're part of the room, so in a friend's room they follow the host's reading.
+  // your first whole book. They're part of the room and stay open for everyone in it: in the shared library
+  // anyone's reading opens them, and in a friend's room the host's.
   function checkDoors() {
     if (!S.gl || !S.room || S.mode !== 'play' || (S.shared && !S.isHost && !S.commons)) return;
     const st = RD.stats(), d = S.room.doors || {}, said = [];
