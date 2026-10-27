@@ -58,7 +58,7 @@
     shared: false, isHost: false, commons: false,   // commons: the one shared library everyone on this page walks into
     others: new Map(),                   // pid -> remote reader
     findId: null, findT: 0,
-    taken: new Set(),                    // every book you have taken down (Malcolm X opens at ten, with one read to the end)
+    taken: new Set(),                    // every book you have taken down (Malcolm X and Martin Luther King Jr. open at ten, with one read to the end)
     lastSave: 0
   };
   const P = { x: 0, z: 6.0, yaw: 0, pitch: -0.06, vx: 0, vz: 0, seat: null, eye: 1.62, eyeNow: 1.62, walkTo: null, stuck: 0, bob: 0, speed: 0 };
@@ -280,10 +280,13 @@
     }
   }
 
-  /* ---------------- who you are: your own books, and Malcolm X ---------------- */
+  /* ---------------- who you are: your own books, and the readers you meet by reading ---------------- */
   // The books of the person you read as glow for you: their own, or for Harriet Bailey her son's two
-  // autobiographies, where she is remembered, and for Malcolm X books he names from his reading in the
-  // Norfolk Prison Colony (The Autobiography of Malcolm X, "Saved").
+  // autobiographies, where she is remembered; for Paul Robeson, Othello and the books of the spirituals he sang;
+  // for Malcolm X books he names from his reading in the Norfolk Prison Colony (The Autobiography of Malcolm X,
+  // "Saved"); for Martin Luther King Jr. Thoreau, whose essay on civil disobedience he first read at Morehouse,
+  // and the writers he names in "Pilgrimage to Nonviolence" (1958): Rauschenbusch, Plato, Aristotle, Mill, Marx
+  // (the Manifesto) and Gandhi, where they are on the shelves.
   const OWN = {
     douglass: (b) => /Frederick Douglass/.test(b.author),
     wells: (b) => /Ida B\. Wells/.test(b.author),
@@ -292,11 +295,15 @@
     jacobs: (b) => /Harriet Jacobs/.test(b.author),
     washington: (b) => /Booker T\. Washington/.test(b.author),
     bailey: (b) => b.id === 'douglass-narrative' || b.id === 'douglass-bondage',
-    malcolm: (b) => /^(dubois-souls|stowe-uncle-tom|kemble-journal|turner-confessions)$/.test(b.id) || /Negro in Our History/.test(b.title) || /Herodotus|Olmsted/.test(b.author)
+    robeson: (b) => b.id === 'shakespeare-othello' || /spiritual|Religious Folk-Songs|^Slave Songs/i.test(b.title),
+    malcolm: (b) => /^(dubois-souls|stowe-uncle-tom|kemble-journal|turner-confessions)$/.test(b.id) || /Negro in Our History/.test(b.title) || /Herodotus|Olmsted/.test(b.author),
+    king: (b) => /^(thoreau-walden|marx-manifesto)$/.test(b.id) || /^(Plato|Aristotle|John Stuart Mill|Walter Rauschenbusch|Mohandas K\. Gandhi|M\. K\. Gandhi)$/.test(b.author)
   };
   const ownBooks = (av) => { const f = OWN[av]; return f ? S.books.filter(f).map(b => b.id) : []; };
   function paintOwn() { if (S.gl && W.setOwn) W.setOwn(ownBooks(S.me.avatar)); }
-  // Malcolm X is unlocked by reading: ten books taken down, and one read to the end
+  // Malcolm X, Martin Luther King Jr. and Kwame Ture (young, as Stokely Carmichael, and old) are met by reading:
+  // ten books taken down, and one read to the end
+  const HIDDEN = new Set(['malcolm', 'king', 'carmichael', 'ture']);
   const MALCOLM = { taken: 10, done: 1 };
   const malcolmProgress = () => ({ taken: S.taken.size, done: RD.stats().books });
   function malcolmOpen() { const p = malcolmProgress(); return !!store.load('malcolm', false) || (p.taken >= MALCOLM.taken && p.done >= MALCOLM.done); }
@@ -305,7 +312,7 @@
     const p = malcolmProgress();
     if (p.taken < MALCOLM.taken || p.done < MALCOLM.done) return;
     store.save('malcolm', true);
-    toast('You have taken down ten books and read one to the end. Malcolm X, who educated himself in a prison library, copying out the dictionary page by page, can now be chosen on the title page.', 9000);
+    toast('You have taken down ten books and read one to the end. New readers can now be chosen on the title page: Malcolm X, who educated himself in a prison library, copying out the dictionary page by page; Martin Luther King Jr., who entered Morehouse College at fifteen and first read Thoreau there; and Kwame Ture, as the young Stokely Carmichael and in his last years in Guinea.', 14000);
     buildWho();
   }
 
@@ -1456,8 +1463,8 @@
   /* ---------------- title screen ---------------- */
   function buildWho() {
     const box = $('#who');
-    if (S.me.avatar === 'malcolm' && !malcolmOpen()) S.me.avatar = 'douglass';
-    if (!AV.LIST.some(p => p.id === S.me.avatar)) S.me.avatar = AV.LIST[0].id;
+    if (HIDDEN.has(S.me.avatar) && !malcolmOpen()) S.me.avatar = 'douglass';
+    if (!AV.LIST.some(p => p.id === S.me.avatar)) S.me.avatar = 'douglass';
     // the tiles are in index.html, so the faces show before any script runs; here each gets its state, in AV.LIST's order
     const have = new Map([...box.querySelectorAll('.who[data-id]')].map(b => [b.dataset.id, b]));
     have.forEach((b, id) => { if (!AV.LIST.some(p => p.id === id)) b.remove(); });
@@ -1467,7 +1474,7 @@
       if (!b) { b = document.createElement('button'); b.type = 'button'; b.className = 'who'; b.dataset.id = p.id; b.innerHTML = `<img alt="" src="portraits/${p.id}.webp"><span class="n"></span><span class="y"></span>`; }
       box.appendChild(b);
       // a hidden reader until you meet them: a dark figure, no name, and how far you are from meeting them
-      const locked = p.id === 'malcolm' && !malcolmOpen();
+      const locked = HIDDEN.has(p.id) && !malcolmOpen();
       b.classList.toggle('locked', locked);
       b.setAttribute('aria-pressed', S.me.avatar === p.id ? 'true' : 'false');
       b.title = locked ? `Someone is waiting to be met. Take down ten books (${Math.min(pr.taken, 10)} so far) and read one to the end (${Math.min(pr.done, 1)} of 1).` : p.line;
@@ -1548,7 +1555,7 @@
     RD.init({ store, books: S.books, onClose: onReaderClosed, award: (n) => { try { if (A && A.award) { const k = A.award(SLUG, 'read', n || 1); if (k && k.awarded) toast('+1 bead on your keyring for a chapter read.', 2200); } } catch (e) {} },
       onNote: (bookId, note) => { if (S.shared && note.shared) NET.note(bookId, note); },
       onNoteChange: (bookId, note, id) => { if (S.shared && NET) NET.noteChange(bookId, note, id); }, others: () => S.shared });
-    buildWho();                                          // again, with your reading counted (how near you are to meeting Malcolm X)
+    buildWho();                                          // again, with your reading counted (how near you are to meeting the hidden readers)
     renderer = W ? makeRenderer() : null;
     S.gl = !!renderer;
     if (!S.gl) {

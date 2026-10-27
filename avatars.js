@@ -1,6 +1,6 @@
 /* THE READING ROOM — avatars.js: who you read as.
 
-   Eight readers, each a figure carved from soft shapes and painted like a good wooden doll: a sculpted head
+   Twelve readers, each a figure carved from soft shapes and painted like a good wooden doll: a sculpted head
    (brow, cheekbones, nose, lips and chin pushed out of one surface), set-in eyes that look about, lids that
    blink and drop toward the page, a painted face (brows, the colour of the lips, lines of age) and hair that
    is the person's own. Each is carried by what people know from photographs and engravings, or from words:
@@ -15,9 +15,18 @@
      Ida B. Wells: upswept hair with a curled fringe, high collar, brooch, puffed sleeves, gold earrings.
      Booker T. Washington: close crop parted on the left, clean-shaven, dark three-piece suit, high stiff collar.
      W. E. B. Du Bois: goatee and upturned moustache, receding hair, three-piece suit worn open, watch chain.
+     Paul Robeson: tall and broad, close-cropped hair, clean-shaven, a dark three-piece suit.
      Malcolm X: browline glasses, close crop, moustache, white shirt and narrow tie with a clip.
-   Heights follow the people where known (Douglass about six feet, Du Bois five foot six, Malcolm X six foot
-   three); the others are estimates. Skin tones are each person's own, warm under the lamps.
+     Martin Luther King Jr.: close crop, a thin moustache, a round face, dark suit, white shirt, dark tie.
+     Stokely Carmichael, as in the photographs of 1966 to 1968: tall and lean, a short natural, clean-shaven,
+       the black turtleneck and dark glasses.
+     Kwame Ture in his last years in Guinea, the same man: grey natural hair high at the temples, a short grey
+       beard, a long white West African robe embroidered in blue at the neck and down the front.
+   Heights follow the people where known, so they stand true to one another: Douglass about six feet, Harriet
+   Jacobs five foot four (Norcom's runaway notice, 1835), Du Bois five foot six, King about five foot seven,
+   Malcolm X and Paul Robeson six foot three. Harriet Bailey is "tall" in her son's words. Carmichael, about six
+   foot two, is estimated from Bob Fitch's 1966 photograph of him walking beside King. Wells, Washington
+   and Wheatley have no recorded height; they stand at about the average of their time. Skin tones are each person's own, warm under the lamps.
 
    build(id) -> av: { root, hand, head, setState({ speed, sit, read, listen }), update(dt), info, height }
      root: feet at y = 0, facing +z. hand: the Object3D main.js parents the carried book to. It follows the
@@ -40,15 +49,19 @@ const RR_AVATARS = (() => {
   const T = THREE;
   // One entry here and one look in LOOKS make a reader. Wheatley stands where Harriet Tubman was and Harriet
   // Bailey where Sojourner Truth was (ALIAS turns a saved or remote 'tubman' or 'truth' into them).
-  const LIST = [
-    { id: 'douglass', name: 'Frederick Douglass', years: '1818–1895', line: 'Learned to read in Baltimore against his enslaver\'s orders; wrote three autobiographies.' },
+  const LIST = [                                            // in order of birth, as the title page shows them
     { id: 'wheatley', name: 'Phillis Wheatley', years: 'c. 1753–1784', line: 'Brought to Boston from West Africa as a child, she could read the Bible within sixteen months; published Poems on Various Subjects in 1773.' },
     { id: 'bailey', name: 'Harriet Bailey', years: 'c. 1792–1825', line: 'Frederick Douglass\'s mother, a Maryland field hand who walked twelve miles at night to see him; he learned after her death that she could read.' },
     { id: 'jacobs', name: 'Harriet Jacobs', years: 'c. 1813–1897', line: 'Taught to read as a girl; hid nearly seven years in a crawlspace in her grandmother\'s house, then wrote Incidents in the Life of a Slave Girl.' },
-    { id: 'wells', name: 'Ida B. Wells', years: '1862–1931', line: 'Born enslaved in Mississippi; journalist who documented lynching.' },
+    { id: 'douglass', name: 'Frederick Douglass', years: '1818–1895', line: 'Learned to read in Baltimore against his enslaver\'s orders; wrote three autobiographies.' },
     { id: 'washington', name: 'Booker T. Washington', years: '1856–1915', line: 'Born enslaved in Virginia; learned to read while working in salt furnaces and a coal mine, walked much of the way to Hampton, and founded Tuskegee.' },
+    { id: 'wells', name: 'Ida B. Wells', years: '1862–1931', line: 'Born enslaved in Mississippi; journalist who documented lynching.' },
     { id: 'dubois', name: 'W. E. B. Du Bois', years: '1868–1963', line: 'Historian and sociologist; wrote The Souls of Black Folk.' },
-    { id: 'malcolm', name: 'Malcolm X', years: '1925–1965', line: 'Rebuilt himself through reading in a prison library.' }
+    { id: 'robeson', name: 'Paul Robeson', years: '1898–1976', line: 'Son of a man who escaped slavery in North Carolina; valedictorian at Rutgers, a law degree from Columbia, then the spirituals in concert and Othello on the London stage.' },
+    { id: 'malcolm', name: 'Malcolm X', years: '1925–1965', line: 'Rebuilt himself through reading in a prison library.' },
+    { id: 'king', name: 'Martin Luther King Jr.', years: '1929–1968', line: 'Entered Morehouse College at fifteen, where he first read Thoreau on civil disobedience: his first contact with the theory of nonviolent resistance.' },
+    { id: 'carmichael', name: 'Stokely Carmichael', years: '1941–1998', line: 'Born in Port of Spain, Trinidad; from his first day at the Bronx High School of Science he kept a list of writers to read; a Freedom Rider at nineteen, he took a philosophy degree at Howard and organised Black voters in Lowndes County, Alabama.' },
+    { id: 'ture', name: 'Kwame Ture', years: '1941–1998', line: 'Stokely Carmichael took the name Kwame Ture to honour Kwame Nkrumah and Sékou Touré; he made his home in Conakry, Guinea, and organised for the All-African People\'s Revolutionary Party until his death in 1998.' }
   ];
   const ALIAS = { tubman: 'wheatley', truth: 'bailey' };      // readers who used to be here -> who stands in their place
 
@@ -315,11 +328,11 @@ const RR_AVATARS = (() => {
   // face: w width, long length, jaw narrowing, deep-set eyes, brow ridge, cheek(bones), full (soft cheeks),
   // age, nw/nl nose width/length, lips fullness, mw mouth width, chin, muzzle
   const LOOKS = {
-    douglass: { h: 1.85, sex: 'm', b: 1.06, skin: 0x75503a, hair: 0xf2eee6, brow: 0xd9d2c6, browK: 1.5,
+    douglass: { h: 1.83, sex: 'm', b: 1.06, skin: 0x75503a, hair: 0xf2eee6, brow: 0xd9d2c6, browK: 1.5,
       face: { w: 1.05, jaw: 0.14, deep: 1.4, brow: 1.5, cheek: 1, age: 0.9, nw: 1.2, nl: 1.06, lips: 1.05, mw: 1.05, chin: 1.1 },
       hairStyle: 'mane', beard: 'full', top: 'frock', coat: 0x23242b, lapel: 0x17171b, vest: 0x2d2c31, trousers: 0x3a3a41, shirt: 0xf0ebe0, tie: 0x0d0d0f, tieStyle: 'bow',
       shoes: 0x0d0a08, collarH: 0.064, lapW: 0.066, yBtn: 1.2 },
-    jacobs: { h: 1.6, sex: 'f', b: 0.97, skin: 0x6c4733, hair: 0x8a857c, brow: 0x3c322b, browK: 0.8,
+    jacobs: { h: 1.63, sex: 'f', b: 0.97, skin: 0x6c4733, hair: 0x8a857c, brow: 0x3c322b, browK: 0.8,
       face: { w: 0.96, long: 1.03, jaw: 0.26, deep: 1.2, brow: 0.8, cheek: 1.25, full: 0.6, age: 1, nw: 1.05, nl: 1.02, lips: 0.85, mw: 0.95, chin: 0.95 },
       hairStyle: 'parted', dress: 0x19171a, collar: 'high', lace: 0xe9e3d6, brooch: 0xc9a050, cuffs: 0xe9e3d6, buttons: 0x0c0b0d, shoes: 0x110d0b,
       sleeve: 'fitted', skirt: { hem: 0.29, hip: 0.19 } },
@@ -331,7 +344,7 @@ const RR_AVATARS = (() => {
       face: { w: 0.98, long: 1, jaw: 0.3, deep: 1, brow: 0.85, cheek: 1.25, full: 0.8, age: 0.12, nw: 1.18, nl: 0.98, lips: 1.15, mw: 1.03, chin: 0.85 },
       hairStyle: 'wrap', wrap: 0x8a3324, dress: 0x7a6d5a, apron: 0xb8ad95, sleeve: 'rolled', shoes: 0x3a2a1e, shoeRough: 0.85, weave: 0.7,
       skirt: { hem: 0.255, hip: 0.19, len: 0.99 } },
-    wells: { h: 1.55, sex: 'f', b: 0.96, skin: 0x684330, hair: 0x120d0b, brow: 0x140e0b, browK: 1.1,
+    wells: { h: 1.6, sex: 'f', b: 0.96, skin: 0x684330, hair: 0x120d0b, brow: 0x140e0b, browK: 1.1,
       face: { w: 1.03, long: 0.97, jaw: 0.2, deep: 1, brow: 1.1, cheek: 1.2, full: 1.4, age: 0.1, nw: 1.16, nl: 0.98, lips: 1.2, mw: 1, chin: 1 },
       hairStyle: 'updo', dress: 0x1b2033, collar: 'high', brooch: 0xd8b25a, buttons: 0x0b0b0e, sleeve: 'mutton', earrings: 0xd8b25a, shoes: 0x0f0c0a,
       skirt: { hem: 0.31, hip: 0.195 } },
@@ -343,10 +356,25 @@ const RR_AVATARS = (() => {
       face: { w: 0.95, long: 1.05, jaw: 0.3, deep: 1.15, brow: 1.1, cheek: 0.8, full: 0.6, age: 0.5, nw: 0.9, nl: 1.1, lips: 0.85, mw: 0.95, chin: 1.05 },
       hairStyle: 'receding', beard: 'goatee', top: 'suit', open: true, coat: 0x46454b, vest: 0x3b3a40, trousers: 0x46454b, shirt: 0xf2eee5, tie: 0x3a1621, tieStyle: 'four',
       chain: 0xd6b25a, shoes: 0x0d0a08, collarH: 0.052, lapW: 0.056, yBtn: 1.1 },
+    robeson: { h: 1.91, sex: 'm', b: 1.08, skin: 0x5e3d2a, hair: 0x15100d, brow: 0x140f0c, browK: 1.1,
+      face: { w: 1.13, long: 1.08, jaw: 0.5, deep: 1.05, brow: 1.2, cheek: 1.2, full: 1.05, age: 0.35, nw: 1.32, nl: 1.04, lips: 1.4, mw: 1.12, chin: 1.2 },
+      hairStyle: 'receding', top: 'suit', coat: 0x55524f, vest: 0x4a4744, trousers: 0x55524f, shirt: 0xf2eee5, tie: 0x5a2a22, tieStyle: 'four',
+      shoes: 0x0b0908, collarH: 0.05, lapW: 0.06, yBtn: 1.16 },
     malcolm: { h: 1.91, sex: 'm', b: 0.97, skin: 0x9a6a4d, hair: 0x5a3020, brow: 0x46281a, browK: 1.15,
       face: { w: 0.96, long: 1.07, jaw: 0.2, deep: 1.05, brow: 1.15, cheek: 0.9, full: 0.5, age: 0.25, nw: 0.95, nl: 1.06, lips: 0.95, mw: 1, chin: 1.2 },
       hairStyle: 'crop', beard: 'mustache', specs: 'browline', freckles: true, top: 'suit', coat: 0x3a3733, trousers: 0x3a3733, shirt: 0xf5f2ea, tie: 0x141416, tieStyle: 'narrow',
-      clip: 0xd6c08a, shoes: 0x0b0908, collarH: 0.04, lapW: 0.044, yBtn: 1.1 }
+      clip: 0xd6c08a, shoes: 0x0b0908, collarH: 0.04, lapW: 0.044, yBtn: 1.1 },
+    king: { h: 1.7, sex: 'm', b: 1.0, skin: 0x7a5038, hair: 0x15100d, brow: 0x16100c, browK: 1.05,
+      face: { w: 1.1, long: 0.95, jaw: 0.12, deep: 0.95, brow: 0.95, cheek: 1.4, full: 1.55, age: 0.2, nw: 1.15, nl: 0.96, lips: 1.2, mw: 1.04, chin: 0.92 },
+      hairStyle: 'crop', beard: 'mustache', top: 'suit', coat: 0x24252b, trousers: 0x24252b, shirt: 0xf4f1ea, tie: 0x1a1c24, tieStyle: 'four',
+      shoes: 0x0b0908, collarH: 0.045, lapW: 0.05, yBtn: 1.14 },
+    carmichael: { h: 1.88, sex: 'm', b: 0.92, skin: 0x5c3b29, hair: 0x120d0b, brow: 0x130e0b, browK: 1.05,
+      face: { w: 0.94, long: 1.1, jaw: 0.22, deep: 1.0, brow: 1.05, cheek: 1.2, full: 0.65, age: 0, nw: 1.2, nl: 1.02, lips: 1.25, mw: 1.05, chin: 1.05 },
+      hairStyle: 'natural', hairVol: 0.008, specs: 'shades', top: 'turtleneck', coat: 0x0f0f11, trousers: 0x161619, shoes: 0x0b0908, collarH: 0.04, lapW: 0.04, yBtn: 1.12 },
+    ture: { h: 1.88, sex: 'm', b: 0.92, skin: 0x5e3d2b, hair: 0xbcb5aa, brow: 0x8c847a, browK: 0.9, freckles: true,
+      face: { w: 0.94, long: 1.1, jaw: 0.22, deep: 1.05, brow: 1.05, cheek: 1.25, full: 0.5, age: 0.85, nw: 1.2, nl: 1.04, lips: 1.15, mw: 1.05, chin: 1.05 },
+      hairStyle: 'natural', hairVol: 0.012, recede: 1, beard: 'full', beardK: 0.32, top: 'robe', coat: 0xf0ece3, embroidery: 0x2d5597, sleeve: 'wide',
+      trousers: 0xe6e1d6, shoes: 0x3a2a1e, collarH: 0.04, lapW: 0.04, yBtn: 1.12 }
   };
 
   /* ---------------- the head: one sculpted surface, read in degrees (az from the front, el up) ---------------- */
@@ -641,9 +669,17 @@ const RR_AVATARS = (() => {
       const line = [[0, 40], [12, 40], [24, 37.5], [34, 31], [44, 27], [56, 20], [68, 10], [76, -2], [81, -9], [88, 2], [100, -4], [140, -26], [180, -31]];
       add('skull', hairM, H.shell((az, el, d) => {
         const dh = el - hl(line, az), m = smooth(-2.5, 2.5, dh);
-        const part = 1 - 0.85 * Math.exp(-(((az - 33) / 1.8) ** 2)) * smooth(37, 44, el) * smooth(78, 64, el);
+        const part = L.noPart ? 1 : 1 - 0.85 * Math.exp(-(((az - 33) / 1.8) ** 2)) * smooth(37, 44, el) * smooth(78, 64, el);
         return cover(m, lerp(0.001, 0.0032 + 0.0042 * Math.max(0, d.y) + 0.0012 * Math.max(0, -d.z), smooth(0, 7, dh)) * part);
       }, { el0: -50, ne: 52, ru: 18, rv: 7 }));
+    } else if (st === 'natural') {
+      // a natural, cropped round the head (hairVol: how full), the hairline rising at the temples with age (recede)
+      const rc = L.recede || 0, vol = L.hairVol || 0.006;
+      const line = [[0, 38 + 10 * rc], [12, 38 + 12 * rc], [24, 35 + 16 * rc], [34, 30 + 14 * rc], [44, 25 + 8 * rc], [56, 18 + 4 * rc], [68, 9], [76, -2], [81, -9], [88, 2], [100, -4], [140, -26], [180, -31]];
+      add('skull', hairM, H.shell((az, el, d) => {
+        const dh = el - hl(line, az), m = smooth(-2.5, 2.5, dh), g = smooth(0, 9, dh);
+        return cover(m, lerp(0.0015, vol * (1 + 0.35 * Math.max(0, d.y) + 0.25 * Math.max(0, -d.z)), g) + 0.0007 * vol / 0.006 * Math.sin(az * D * 41) * Math.sin(el * D * 37) * g);
+      }, { el0: -50, ne: 52, ru: 22, rv: 8 }));
     }
     const beardM = L.beard ? new T.MeshStandardMaterial({ color: L.hair, map: strandTile(), bumpMap: strandTile(), bumpScale: 1.6, roughness: 0.75 }) : null;
     if (L.beard === 'full') {
@@ -654,7 +690,7 @@ const RR_AVATARS = (() => {
         let m = smooth(-2, 2.5, dh) * smooth(102, 92, A);
         m *= 1 - bump(az, el, 0, -39.6, 17, 4.6);
         const g = smooth(0, 14, dh);
-        const h = lerp(0.0025, 0.006 + 0.016 * smooth(-40, -72, el) + 0.006 * smooth(-62, -88, el) * (1 - 0.5 * smooth(60, 100, A)), g)
+        const h = (L.beardK || 1) * lerp(0.0025, 0.006 + 0.016 * smooth(-40, -72, el) + 0.006 * smooth(-62, -88, el) * (1 - 0.5 * smooth(60, 100, A)), g)
           + 0.002 * Math.sin(az * D * 23 + el * D * 9) * g - 0.002 * bump(az, el, 0, -29.5, 14, 3);
         return cover(m, h);
       }, { az0: -110, az1: 110, na: 60, el1: 0, ne: 40, ru: 14, rv: 4, front: 1.5 }));
@@ -712,18 +748,20 @@ const RR_AVATARS = (() => {
         return at(az, el, capH(az, el, dirOf(az, el, dir)) + 0.0022, out);
       }, { ref: (pp) => pp }));
     }
-    if (L.specs === 'browline') {
-      // browline spectacles: heavy dark tops over the brows, fine gold rims below, gold bridge and arms
-      const top = mat(0x15100c, 0.35), wire = mat(0xc9b07a, 0.3, 0.9), glass = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.1, depthWrite: false });
+    if (L.specs === 'browline' || L.specs === 'shades') {
+      // browline spectacles: heavy dark tops over the brows, fine gold rims below, gold bridge and arms;
+      // shades: the same frame all in black, with dark lenses
+      const dark = L.specs === 'shades';
+      const top = mat(0x15100c, 0.35), wire = dark ? mat(0x0c0b0b, 0.3) : mat(0xc9b07a, 0.3, 0.9), glass = dark ? new T.MeshStandardMaterial({ color: 0x07080a, roughness: 0.08, metalness: 0.35 }) : new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.1, depthWrite: false });
       const z0 = Math.max(C.z + ER + 0.011, H.surf(eyeAz, 13, new T.Vector3()).z + 0.0075), tops = [], rims = [], lens = [];
       [-1, 1].forEach(s => {
-        const cx = s * (C.x + 0.003), cy = C.y + 0.001, w = 0.025, hh = 0.017;
+        const cx = s * (C.x + 0.003), cy = C.y + (dark ? -0.001 : 0.001), w = dark ? 0.027 : 0.025, hh = dark ? 0.02 : 0.017;
         const pt = (a) => new T.Vector3(cx + Math.cos(a) * w * s, cy + Math.sin(a) * hh * (Math.sin(a) > 0 ? 1.05 : 1), z0 - 0.006 * Math.pow(Math.max(0, Math.cos(a) * s * s), 2) - (s * Math.cos(a) * s > 0 ? 0.003 : 0));
         const upper = [], lower = [];
         for (let i = 0; i <= 14; i++) upper.push(pt(-0.2 + i / 14 * (Math.PI + 0.4)));
         for (let i = 0; i <= 14; i++) lower.push(pt(Math.PI + 0.2 + i / 14 * (Math.PI - 0.4)));
         tops.push(one(tube(upper, 0.0027, 30)));
-        rims.push(one(tube(lower, 0.0007, 30)));
+        rims.push(one(tube(lower, dark ? 0.0016 : 0.0007, 30)));
         const sh = new T.Shape(); for (let i = 0; i <= 24; i++) { const a = i / 24 * TAU; sh.lineTo(Math.cos(a) * w * 0.98, Math.sin(a) * hh * 0.98); }
         lens.push(one(new T.ShapeGeometry(sh), M4(cx, cy, z0 - 0.002)));
         const hinge = pt(s > 0 ? 0.05 : Math.PI - 0.05);
@@ -737,7 +775,14 @@ const RR_AVATARS = (() => {
     /* --- neck and collars --- */
     const nk = fem ? 0.95 : 1.04;
     add('neck', skinM, loft([[-0.04, 0.058 * nk, 0.056 * nk, 0.055 * nk], [0.02, 0.054 * nk, 0.054 * nk, 0.052 * nk, 0.002], [0.08, 0.05 * nk, 0.052 * nk, 0.048 * nk, 0.006], [0.13, 0.048 * nk, 0.05 * nk, 0.045 * nk, 0.01], [0.17, 0.032, 0.03, 0.03, 0.012], [0.18, 0.001, 0.001, 0.001, 0.012]], 22));
-    if (!fem) {
+    if (!fem && L.top === 'turtleneck') {
+      // a knitted roll collar up the neck, folded over at the top
+      const km = mat(L.coat, 0.92, 0, WV);
+      add('neck', km, loft([[-0.01, 0.0655, 0.068, 0.064, 0.002], [0.03, 0.0615, 0.0635, 0.06, 0.004], [0.075, 0.059, 0.061, 0.0575, 0.006], [0.1, 0.0615, 0.0635, 0.06, 0.007], [0.112, 0.0575, 0.0595, 0.056, 0.007], [0.104, 0.051, 0.053, 0.05, 0.007]], 28));
+    } else if (!fem && L.top === 'robe') {
+      // a round neckline, embroidered (the embroidery runs on down the front, below)
+      add('neck', mat(L.embroidery, 0.6), loft([[-0.03, 0.079, 0.081, 0.076, 0.002, 2], [-0.012, 0.072, 0.074, 0.069, 0.003, 2], [0.002, 0.066, 0.068, 0.063, 0.003, 2], [0.008, 0.062, 0.064, 0.06, 0.003, 2]], 30));
+    } else if (!fem) {
       const ch = L.collarH;
       add('neck', shirt2, loft([[-0.008, 0.0625, 0.066, 0.061, 0.002, 2], [ch * 0.5, 0.061, 0.064, 0.0595, 0.004, 2], [ch, 0.0595, 0.062, 0.058, 0.006, 2]], 26, { a0: 14 * D, a1: 346 * D }));
       if (L.tieStyle === 'bow') {
@@ -745,6 +790,9 @@ const RR_AVATARS = (() => {
         [-1, 1].forEach(s => add('neck', tm, new T.SphereGeometry(1, 12, 8), M4(s * 0.017, ch * 0.4, 0.068, 0.017, 0.0105, 0.0055, 0, 0, s * 0.18)));
         add('neck', tm, new T.SphereGeometry(1, 10, 8), M4(0, ch * 0.4, 0.071, 0.0065, 0.0075, 0.005));
         [-1, 1].forEach(s => add('neck', shirt2, new T.SphereGeometry(1, 10, 6), M4(s * 0.021, ch * 0.66, 0.064, 0.013, 0.009, 0.0025, 0.25, s * 0.35, s * 0.6)));   // wing tips
+      } else if (L.tieStyle === 'none') {
+        // no tie: the collar open at the throat, its points spread out over the jacket
+        [-1, 1].forEach(s => add('neck', shirt2, new T.SphereGeometry(1, 12, 8), M4(s * 0.03, ch * 0.3, 0.062, 0.02, ch * 0.42, 0.0028, -0.35, s * 0.45, s * 1.15)));
       } else {
         const tm = mat(L.tie, 0.5);
         add('neck', tm, new T.CylinderGeometry(0.011, 0.007, 0.024, 10), M4(0, ch * 0.32, 0.066, 1, 1, 0.7, -0.15));
@@ -764,7 +812,15 @@ const RR_AVATARS = (() => {
     const topM = mat(L.coat || L.dress, fem ? 0.78 : 0.8, 0, WV);
     add('chest', topM, loft(TR, 32));
     const yl = (y) => y - 1.02;
-    if (!fem) {
+    if (!fem && L.top === 'robe') {
+      // the robe's embroidery: a band round the neck and a panel down the front
+      const em = mat(L.embroidery, 0.6);
+      add('chest', em, decal(TR, (u, v) => [lerp(-1, 1, u) * lerp(0.02, 0.011, v), lerp(yl(1.43), yl(1.16), v)], 4, 14, 0.0016, 0.0016));
+      [-1, 1].forEach(s => add('chest', em, decal(TR, (u, v) => [s * (lerp(0.029, 0.019, v) + u * 0.004), lerp(yl(1.42), yl(1.2), v)], 2, 12, 0.0012, 0.0014)));
+    } else if (!fem && L.top === 'turtleneck') {
+      // a plain knit: ribbing at the waist
+      add('chest', mat(L.coat, 0.92, 0, WV), decal(TR, (u, v) => [lerp(-0.13, 0.13, u), lerp(yl(1.0), yl(0.975), v)], 16, 1, 0.0012, 0.002));
+    } else if (!fem) {
       const yB = yl(L.yBtn), lw = L.lapW, open = !!L.open;
       const xi = (v) => -lerp(0.034, open ? 0.06 : 0.004, Math.pow(v, 0.8));
       const yv = (v) => lerp(yl(1.448), yB, v);
@@ -781,7 +837,7 @@ const RR_AVATARS = (() => {
         for (let i = 0; i < (open ? 6 : 2); i++) { const y = yl(1.25) - i * 0.048; if (y < vBot + 0.02) break; add('chest', mat(0x1a1714, 0.4), new T.SphereGeometry(1, 8, 6), M4(0, y, surfZ(TR, 0, y) + 0.008, 0.0055, 0.0055, 0.003)); }
       }
       // the tie: four-in-hand or narrow; under the waistcoat
-      if (L.tieStyle !== 'bow') {
+      if (L.tieStyle !== 'bow' && L.tieStyle !== 'none') {
         const narrow = L.tieStyle === 'narrow', yEnd = yl(narrow ? 1.05 : 1.22);
         add('chest', mat(L.tie, 0.5), decal(TR, (u, v) => { const y = lerp(yl(1.445), yEnd, v); const w = narrow ? lerp(0.012, 0.016, v) : lerp(0.014, 0.03, v); const tip = v > 0.9 ? (1 - v) / 0.1 : 1; return [lerp(-w, w, u) * lerp(0.15, 1, tip), y - (Math.abs(u - 0.5) * 2) * 0 ]; }, 4, 16, 0.0028, 0.0016));
         if (L.clip) add('chest', mat(L.clip, 0.25, 0.9), new T.BoxGeometry(1, 1, 1), M4(0, yl(1.24), surfZ(TR, 0, yl(1.24)) + 0.006, 0.04, 0.0035, 0.003));
@@ -841,6 +897,12 @@ const RR_AVATARS = (() => {
         R.drapes.push({ mat: mat(L.apron, 0.88, 0, { weave: 0.6, side: T.DoubleSide }), top, len, span: [-68, 68], na: 20, nt: 10, lift: 0.007,
           rx: steps(8).map(t => [t, lin(srx, clamp((0.135 - (top - t * len)) / slen, 0, 1)) + 0.007 + 0.004 * t]), f: 0.88, b: 1.1, z0: -0.025, fall: 1 });
       }
+    } else if (L.top === 'robe') {
+      R.drapes.push({ mat: mat(L.coat, 0.85, 0, WV2), top: 0.13, len: 0.86, gap: [0, 0], na: 36, nt: 14,
+        rx: [[0, 0.158], [0.1, 0.18], [0.4, 0.215], [1, 0.25]], f: 0.86, b: 1.0, z0: -0.015, fall: 1 });
+    } else if (L.top === 'turtleneck') {
+      R.drapes.push({ mat: mat(L.coat, 0.92, 0, WV2), top: 0.13, len: 0.07, gap: [0, 0], na: 28, nt: 3,
+        rx: [[0, 0.152], [1, 0.158]], f: 0.8, b: 0.9, z0: -0.008, fall: 0.2 });
     } else if (L.top === 'frock') {
       R.drapes.push({ mat: mat(L.coat, 0.8, 0, WV2), top: 0.13, len: 0.55, gap: [17, 9], na: 28, nt: 10,
         rx: [[0, 0.15], [0.12, 0.172], [0.5, 0.196], [1, 0.216]], f: 0.78, b: 0.88, z0: -0.01, fall: 1 });
@@ -850,7 +912,7 @@ const RR_AVATARS = (() => {
     }
 
     /* --- arms --- */
-    const sleeveM = fem ? mat(L.dress, 0.75, 0, WV) : topM, cuffM = fem ? mat(L.cuffs || L.fichu || L.dress, 0.8) : shirtM;
+    const sleeveM = fem ? mat(L.dress, 0.75, 0, WV) : topM, cuffM = fem ? mat(L.cuffs || L.fichu || L.dress, 0.8) : L.top === 'turtleneck' ? topM : shirtM;
     let upper, fore, cuff = null, ruffle = null;
     if (L.sleeve === 'mutton') {
       upper = limb([[0.05, 0.001], [0.044, 0.046], [0.026, 0.07], [-0.005, 0.08], [-0.06, 0.075], [-0.13, 0.058], [-0.2, 0.046], [-0.29, 0.041], [-0.315, 0.03], [-0.325, 0.001]], 0.94);
@@ -862,6 +924,10 @@ const RR_AVATARS = (() => {
     } else if (L.sleeve === 'rolled') {
       upper = limb([[0.018, 0.001], [0.012, 0.032], [0, 0.044], [-0.02, 0.05], [-0.1, 0.048], [-0.2, 0.046], [-0.245, 0.046], [-0.258, 0.053], [-0.278, 0.054], [-0.292, 0.048], [-0.298, 0.001]], 0.95);
       fore = limb([[0.035, 0.001], [0.02, 0.031], [0, 0.036], [-0.1, 0.034], [-0.2, 0.028], [-0.24, 0.026], [-0.252, 0.02], [-0.256, 0.001]]);
+    } else if (L.sleeve === 'wide') {
+      // a robe's sleeve, full and widening to an open end at the wrist
+      upper = limb([[0.03, 0.001], [0.02, 0.04], [0.004, 0.058], [-0.02, 0.068], [-0.1, 0.072], [-0.2, 0.075], [-0.3, 0.078], [-0.33, 0.06], [-0.335, 0.001]], 0.96);
+      fore = limb([[0.05, 0.001], [0.035, 0.05], [0, 0.07], [-0.1, 0.074], [-0.18, 0.078], [-0.215, 0.08], [-0.222, 0.05], [-0.226, 0.03], [-0.228, 0.001]]);
     } else if (L.sleeve === 'elbow') {
       upper = limb([[0.018, 0.001], [0.012, 0.032], [0, 0.044], [-0.02, 0.05], [-0.1, 0.049], [-0.2, 0.046], [-0.27, 0.046], [-0.295, 0.044], [-0.305, 0.03], [-0.315, 0.001]]);
       fore = limb([[0.035, 0.001], [0.02, 0.031], [0, 0.036], [-0.1, 0.033], [-0.2, 0.027], [-0.24, 0.025], [-0.252, 0.02], [-0.256, 0.001]]);

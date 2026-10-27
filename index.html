@@ -7,12 +7,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>The Reading Room</title>
-<meta name="description" content="A walkable library of 256 free books. Begin with the slave narratives in their own words, then the radical tradition and Black history the world over. Read together: whoever opens the link walks into the same library.">
+<meta name="description" content="A walkable library of 409 free books. Begin with the slave narratives in their own words, then the radical tradition and Black history the world over. Read together: whoever opens the link walks into the same library.">
 <link rel="canonical" href="https://library.jordanstrudwick.com/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="The Reading Room">
 <meta property="og:title" content="The Reading Room">
-<meta property="og:description" content="A walkable library of 256 free books. Begin with the slave narratives in their own words, then the radical tradition and Black history the world over. Read together: whoever opens the link walks into the same library.">
+<meta property="og:description" content="A walkable library of 409 free books. Begin with the slave narratives in their own words, then the radical tradition and Black history the world over. Read together: whoever opens the link walks into the same library.">
 <meta property="og:url" content="https://library.jordanstrudwick.com/">
 <meta property="og:image" content="https://library.jordanstrudwick.com/og/preview.jpg">
 <meta property="og:image:width" content="1200">
@@ -79,12 +79,19 @@ body:not(.playing) #tools,body.reading #tools,body.reading #home,body.reading #b
 .logo .t{font-family:var(--serif);font-weight:700;letter-spacing:.16em;color:var(--gold2);font-size:clamp(30px,7vw,64px);line-height:1.05;
   text-shadow:0 3px 0 #5a3610,0 10px 40px rgba(232,176,75,.25)}
 .logo .s{margin-top:10px;color:var(--ink);opacity:.9;font-size:clamp(14px,3.4vw,18px)}
-.epi{margin:18px auto 6px;max-width:560px;font-family:var(--serif);font-style:italic;color:var(--dim);text-align:center;font-size:15px;line-height:1.5}
-.epi b{display:block;font-style:normal;font-weight:400;font-size:12px;letter-spacing:.08em;margin-top:4px;color:#8f7d60}
+.epi{margin:16px auto 4px;max-width:740px;padding:10px 18px;border-radius:18px;font-family:var(--serif);color:var(--dim);text-align:center;line-height:1.5;
+  background:radial-gradient(ellipse at 50% 50%,rgba(10,7,4,.62),rgba(10,7,4,.38) 70%,rgba(10,7,4,0))}
+.epi .ctx,.epi .then{margin:0;font-size:14px;color:#a8977a}
+.epi blockquote{margin:8px 0;font-style:italic;font-size:17px;color:var(--ink)}
+.epi blockquote em{color:var(--gold2)}
+.epi figcaption{font-size:12px;letter-spacing:.08em;margin-top:6px;color:#8f7d60}
+@media (max-width:640px){ .epi blockquote{font-size:15.5px} .epi .ctx,.epi .then{font-size:13px} }
 .invite-note{margin:12px 0 0;padding:10px 14px;border:1px solid var(--gold);border-radius:12px;background:rgba(232,176,75,.12);color:var(--gold2);font-weight:700;text-align:center;max-width:520px}
-.pick-h{margin:22px 0 10px;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);text-align:center}
-#who{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;width:min(860px,100%)}
-@media (max-width:640px){ #who{grid-template-columns:repeat(4,minmax(0,1fr))} .who img,.who .ph{aspect-ratio:1/1} }
+.pick-h{margin:22px 0 12px;font-family:var(--serif);font-weight:700;font-size:clamp(22px,5vw,28px);letter-spacing:.02em;color:var(--gold2);text-align:center}
+#who{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:7px;width:min(1180px,100%)}
+@media (max-width:1000px){ #who{grid-template-columns:repeat(6,minmax(0,1fr));width:min(720px,100%)} }
+@media (max-width:640px){ #who{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px} .who img,.who .ph{aspect-ratio:1/1} #who .who .n{font-size:11.5px;padding:0 1px;letter-spacing:-.01em} #who .who .y{font-size:10.5px} }
+@media (max-width:400px){ #who .who .n{font-size:11px} }
 @media (max-height:700px){ .who img,.who .ph{aspect-ratio:1/1} }
 .who.locked img,.who.locked .ph{filter:brightness(0);opacity:.85}
 .who.locked .q{position:absolute;left:0;right:0;top:22%;text-align:center;font:800 44px/1 var(--serif);color:rgba(232,176,75,.55)}
@@ -96,7 +103,11 @@ body:not(.playing) #tools,body.reading #tools,body.reading #home,body.reading #b
 .who .y{display:block;font-size:11px;color:var(--dim);margin-top:2px}
 .who[aria-pressed="true"]{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset,0 6px 20px rgba(232,176,75,.2)}
 .who:focus-visible{outline:3px solid #fff;outline-offset:2px}
-.row2{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:16px}
+/* the name and Enter stay in reach at the foot of the screen while the page above them scrolls */
+.row2{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:16px;
+  position:sticky;bottom:calc(var(--sab) + 6px);z-index:2;padding:8px 12px;border-radius:20px;background:rgba(13,10,7,.82);box-shadow:0 8px 30px rgba(0,0,0,.5)}
+/* on a phone only the button is pinned (the row's box steps aside so the button can stick to the page itself) */
+@media (max-width:640px){ .row2{display:contents} .row2 .field{margin-top:16px} #go{position:sticky;bottom:calc(var(--sab) + 8px);z-index:2;margin-top:10px;width:min(100%,340px)} }
 .field{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:6px 10px;background:rgba(13,10,7,.6)}
 .field label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .field input{background:none;border:0;outline:none;width:140px;font-weight:700;color:var(--gold2);font-size:16px}
@@ -105,8 +116,14 @@ body:not(.playing) #tools,body.reading #tools,body.reading #home,body.reading #b
 .big:active{transform:translateY(2px);box-shadow:0 2px 0 #8a5514}
 .big:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .link{appearance:none;background:none;border:0;color:var(--dim);text-decoration:underline;text-underline-offset:3px;padding:10px;font-size:14px}
-.keys{margin-top:14px;color:var(--dim);font-size:12.5px;text-align:center;line-height:1.7;max-width:640px}
-.keys b{color:var(--gold)}
+/* how to begin: three steps and the controls, under the Enter button */
+.keys{margin-top:14px;width:min(860px,100%);border:1px solid rgba(232,176,75,.5);border-radius:16px;background:rgba(26,18,10,.82);padding:14px 18px}
+.keys ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.keys li{display:flex;gap:10px;align-items:flex-start;font-size:16px;line-height:1.4;color:var(--ink)}
+.keys li>b{flex:none;width:30px;height:30px;border-radius:50%;background:var(--gold);color:#2a1606;font:800 16px/30px var(--serif);text-align:center}
+.keys .ctl{margin:12px 0 0;padding-top:10px;border-top:1px solid var(--line);font-size:15px;line-height:1.6;color:var(--dim);text-align:center}
+.keys .ctl b{color:var(--gold)}
+@media (max-width:640px){ .keys{padding:12px 14px} .keys ol{grid-template-columns:1fr;gap:10px} .keys li{font-size:15.5px} }
 @media (pointer:coarse){ .keys .kb{display:none} }
 @media (pointer:fine){ .keys .tp{display:none} }
 #loadmsg{margin-top:10px;color:var(--dim);font-size:13px;min-height:18px;text-align:center}
@@ -300,20 +317,31 @@ body.arranging #arrange{display:flex}
 
 <section id="title">
   <div class="logo"><div class="t">THE READING ROOM</div><div class="s">The slave narratives, the radical tradition and Black history the world over on a golden wall; scripture by the fire; the great books in a domed hall. All free to read. Walk in, begin at the lit shelves, sit by the fire.</div></div>
-  <div class="epi">“From that moment, I understood the pathway from slavery to freedom.”<b>FREDERICK DOUGLASS, <i>NARRATIVE</i>, 1845, CHAPTER VI</b></div>
+  <!-- Douglass's own words, as in books/douglass-narrative.json (Chapter VI, third paragraph; the bread is Chapter VII);
+       the Aulds' names and his age are from Chapter V -->
+  <figure class="epi">
+    <p class="ctx">Baltimore. Frederick, a boy of seven or eight, has come to live with Hugh and Sophia Auld. She begins teaching him his A, B, C, until her husband forbids it: reading, he warns, “would forever unfit him to be a slave.”</p>
+    <blockquote>“These words sank deep into my heart, stirred up sentiments within that lay slumbering, and called into existence an entirely new train of thought. … I now understood what had been to me a most perplexing difficulty—to wit, the white man’s power to enslave the black man. … <em>From that moment, I understood the pathway from slavery to freedom.</em> … What he most dreaded, that I most desired.”</blockquote>
+    <p class="then">He went on to teach himself, giving bread to the hungry white boys in the street, who in return gave him “that more valuable bread of knowledge.”</p>
+    <figcaption>FREDERICK DOUGLASS, <i>NARRATIVE</i>, 1845, CHAPTERS VI–VII</figcaption>
+  </figure>
   <div class="invite-note" id="invNote" hidden></div>
-  <div class="pick-h">Who walks in?</div>
+  <div class="pick-h">Who will you inhabit?</div>
   <!-- the readers, in the page itself so their faces show before any script runs (main.js buildWho gives them their state;
        the pictures are drawn by tools/library-portraits.js) -->
   <div id="who" role="group" aria-label="Choose who you read as">
-    <button type="button" class="who" data-id="douglass" aria-pressed="true" title="Learned to read in Baltimore against his enslaver&#x27;s orders; wrote three autobiographies."><img alt="" src="portraits/douglass.webp"><span class="n">Frederick Douglass</span><span class="y">1818–1895</span></button>
     <button type="button" class="who" data-id="wheatley" aria-pressed="false" title="Brought to Boston from West Africa as a child, she could read the Bible within sixteen months; published Poems on Various Subjects in 1773."><img alt="" src="portraits/wheatley.webp"><span class="n">Phillis Wheatley</span><span class="y">c. 1753–1784</span></button>
     <button type="button" class="who" data-id="bailey" aria-pressed="false" title="Frederick Douglass&#x27;s mother, a Maryland field hand who walked twelve miles at night to see him; he learned after her death that she could read."><img alt="" src="portraits/bailey.webp"><span class="n">Harriet Bailey</span><span class="y">c. 1792–1825</span></button>
     <button type="button" class="who" data-id="jacobs" aria-pressed="false" title="Taught to read as a girl; hid nearly seven years in a crawlspace in her grandmother&#x27;s house, then wrote Incidents in the Life of a Slave Girl."><img alt="" src="portraits/jacobs.webp"><span class="n">Harriet Jacobs</span><span class="y">c. 1813–1897</span></button>
-    <button type="button" class="who" data-id="wells" aria-pressed="false" title="Born enslaved in Mississippi; journalist who documented lynching."><img alt="" src="portraits/wells.webp"><span class="n">Ida B. Wells</span><span class="y">1862–1931</span></button>
+    <button type="button" class="who" data-id="douglass" aria-pressed="true" title="Learned to read in Baltimore against his enslaver&#x27;s orders; wrote three autobiographies."><img alt="" src="portraits/douglass.webp"><span class="n">Frederick Douglass</span><span class="y">1818–1895</span></button>
     <button type="button" class="who" data-id="washington" aria-pressed="false" title="Born enslaved in Virginia; learned to read while working in salt furnaces and a coal mine, walked much of the way to Hampton, and founded Tuskegee."><img alt="" src="portraits/washington.webp"><span class="n">Booker T. Washington</span><span class="y">1856–1915</span></button>
+    <button type="button" class="who" data-id="wells" aria-pressed="false" title="Born enslaved in Mississippi; journalist who documented lynching."><img alt="" src="portraits/wells.webp"><span class="n">Ida B. Wells</span><span class="y">1862–1931</span></button>
     <button type="button" class="who" data-id="dubois" aria-pressed="false" title="Historian and sociologist; wrote The Souls of Black Folk."><img alt="" src="portraits/dubois.webp"><span class="n">W. E. B. Du Bois</span><span class="y">1868–1963</span></button>
+    <button type="button" class="who" data-id="robeson" aria-pressed="false" title="Son of a man who escaped slavery in North Carolina; valedictorian at Rutgers, a law degree from Columbia, then the spirituals in concert and Othello on the London stage."><img alt="" src="portraits/robeson.webp"><span class="n">Paul Robeson</span><span class="y">1898–1976</span></button>
     <button type="button" class="who locked" data-id="malcolm" aria-pressed="false"><img alt="" src="portraits/malcolm.webp"><span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">0/10 books · 0/1 read</span></button>
+    <button type="button" class="who locked" data-id="king" aria-pressed="false"><img alt="" src="portraits/king.webp"><span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">0/10 books · 0/1 read</span></button>
+    <button type="button" class="who locked" data-id="carmichael" aria-pressed="false"><img alt="" src="portraits/carmichael.webp"><span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">0/10 books · 0/1 read</span></button>
+    <button type="button" class="who locked" data-id="ture" aria-pressed="false"><img alt="" src="portraits/ture.webp"><span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">0/10 books · 0/1 read</span></button>
   </div>
   <div class="row2">
     <div class="field"><label for="nm">Name</label><input id="nm" maxlength="14" autocomplete="off" spellcheck="false"></div>
@@ -321,9 +349,14 @@ body.arranging #arrange{display:flex}
   </div>
   <button class="link" id="justRead" type="button">Just read — open the catalog</button>
   <div id="loadmsg"></div>
-  <div class="keys">
-    <span class="kb"><b>WASD</b> walk · <b>drag</b> to look · <b>click</b> a book to take it · <b>click</b> a chair to sit and read · <b>Tab</b> rearrange · <b>C</b> catalog · <b>V</b> view</span>
-    <span class="tp">Left thumb walks · drag to look · <b>tap</b> a book to take it, a chair to sit and read · <b>tap the floor</b> to walk there</span>
+  <div class="keys" role="note" aria-label="How to begin">
+    <ol>
+      <li><b>1</b><span>Choose who you will inhabit. Each reader’s own books glow for you.</span></li>
+      <li><b>2</b><span>Enter, and follow the gold carpet to the lit shelves: the slave narratives.</span></li>
+      <li><b>3</b><span class="kb">Click a book to take it down. Click a chair to sit and read.</span><span class="tp">Tap a book to take it down. Tap a chair to sit and read.</span></li>
+    </ol>
+    <p class="ctl kb"><b>WASD</b> walk · <b>drag</b> to look · <b>Z</b> zoom · <b>C</b> catalog · <b>V</b> view · <b>Tab</b> rearrange</p>
+    <p class="ctl tp"><b>Left thumb</b> walks · <b>drag</b> to look · <b>tap the floor</b> to walk there · <b>pinch</b> to zoom</p>
   </div>
   <div id="nogl" hidden>This device can't draw the 3D room, but every book is still here: open the catalog to read.</div>
 </section>
