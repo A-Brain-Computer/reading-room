@@ -23,6 +23,12 @@
   const TAU = Math.PI * 2;
   const touch = (window.matchMedia && matchMedia('(pointer:coarse)').matches) || false;
   document.body.classList.toggle('touch', touch);
+  // what is pointing right now (an iPad with a trackpad, a laptop with a touch screen): the last pointer used decides
+  // how a tap or a hover is read; the layout keeps to the device's main pointer
+  let lastKind = null;
+  const tch = () => (lastKind ? lastKind === 'touch' : touch);
+  addEventListener('pointerdown', (e) => { lastKind = e.pointerType; }, true);
+  addEventListener('pointermove', (e) => { if (e.pointerType !== 'touch') lastKind = e.pointerType; }, true);
   const QS = new URLSearchParams(location.search);
 
   /* ---------------- storage (arcade.save when present; never throws) ---------------- */
@@ -39,10 +45,19 @@
 
   /* ---------------- little UI helpers ---------------- */
   let toastT = 0;
-  function toast(msg, ms) { const el = $('#toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), ms || 2400); }
+  function toast(msg, ms) {
+    const el = $('#toast'), tc = $('#tour');
+    el.style.top = tc && !tc.hidden ? Math.round(tc.getBoundingClientRect().bottom + 8) + 'px' : '';   // under the first walk's card, not over it
+    el.textContent = msg; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), ms || 2400); }
   const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  function openSheet(id) { closeSheets(); soundMenu(false); const el = $('#' + id); el.hidden = false; S.sheet = id; const f = el.querySelector('input,button.x'); if (f && !touch) setTimeout(() => f.focus(), 30); }
-  function closeSheets() { document.querySelectorAll('.sheet').forEach(s => { s.hidden = true; }); S.sheet = null; }
+  // a sheet gives the focus back where it found it (the keyboard's place in the page), not to the page itself
+  let sheetFrom = null;
+  function openSheet(id) { const a = document.activeElement; sheetFrom = a && a !== document.body ? a : null; closeSheets(true); soundMenu(false); const el = $('#' + id); el.hidden = false; S.sheet = id; const f = el.querySelector('input,button.x'); if (f && !touch) setTimeout(() => f.focus(), 30); }
+  function closeSheets(quiet) {
+    const was = S.sheet;
+    document.querySelectorAll('.sheet').forEach(s => { s.hidden = true; }); S.sheet = null;
+    if (quiet !== true && was && sheetFrom && !touch && document.contains(sheetFrom) && sheetFrom.offsetParent !== null) { try { sheetFrom.focus({ preventScroll: true }); } catch (e) { /* gone */ } }
+  }
   document.querySelectorAll('.sheet').forEach(s => {
     s.addEventListener('click', (e) => { if (e.target === s || e.target.hasAttribute('data-close')) closeSheets(); });
   });
@@ -53,12 +68,12 @@
     room: null, ownRoom: null,          // ownRoom: your room, kept aside while you visit a friend's
     pid: null, me: null,
     mode: 'title',                       // title | play | arrange | reader
-    view: 'first', sheet: null,
+    view: 'third', sheet: null,
     gl: false, ready: false,
     shared: false, isHost: false, commons: false,   // commons: the one shared library everyone on this page walks into
     others: new Map(),                   // pid -> remote reader
     findId: null, findT: 0,
-    taken: new Set(),                    // every book you have taken down (Malcolm X and Martin Luther King Jr. open at ten, with one read to the end)
+    taken: new Set(),                    // every book you have taken down (the hidden readers open at ten, with one read to the end)
     lastSave: 0
   };
   const P = { x: 0, z: 6.0, yaw: 0, pitch: -0.06, vx: 0, vz: 0, seat: null, eye: 1.62, eyeNow: 1.62, walkTo: null, stuck: 0, bob: 0, speed: 0 };
@@ -184,7 +199,20 @@
     return null;
   }
   const PILE_MAX = 14;
+  // an op's fields, checked before anything is changed: a friend's op (or a stranger's, on the open relays) may
+  // carry anything, and a NaN position or an "__proto__" key would otherwise end up in the saved room
+  const BAD_KEY = /^(__proto__|constructor|prototype)$/;
+  function opOK(op) {
+    if (!op || typeof op !== 'object' || typeof op.t !== 'string') return false;
+    for (const k of ['id', 'row', 'f', 'type', 'door', 'who']) if (op[k] != null && (typeof op[k] !== 'string' || op[k].length > 80 || BAD_KEY.test(op[k]))) return false;
+    if (op.t === 'screen') return true;                                    // the cinema checks its own fields
+    for (const k of ['x', 'z', 'r', 'i', 's', 'v']) if (op[k] != null && !(typeof op[k] === 'number' && isFinite(op[k]))) return false;
+    if ((op.t === 'fmove' || op.t === 'fadd') && !(Math.abs(op.x) <= 40 && op.z >= -20 && op.z <= 45)) return false;
+    if (op.t === 'pile' && !Number.isInteger(op.s)) return false;
+    return true;
+  }
   function applyOp(room, op) {
+    if (!opOK(op)) return 'That change could not be made.';
     const who = op.who;
     switch (op.t) {
       case 'unlock': {                                 // a door opens for good (the host's reading opens it)
@@ -283,10 +311,6 @@
   /* ---------------- who you are: your own books, and the readers you meet by reading ---------------- */
   // The books of the person you read as glow for you: their own, or for Harriet Bailey her son's two
   // autobiographies, where she is remembered; for Paul Robeson, Othello and the books of the spirituals he sang;
-  // for Malcolm X books he names from his reading in the Norfolk Prison Colony (The Autobiography of Malcolm X,
-  // "Saved"); for Martin Luther King Jr. Thoreau, whose essay on civil disobedience he first read at Morehouse,
-  // and the writers he names in "Pilgrimage to Nonviolence" (1958): Rauschenbusch, Plato, Aristotle, Mill, Marx
-  // (the Manifesto) and Gandhi, where they are on the shelves.
   const OWN = {
     douglass: (b) => /Frederick Douglass/.test(b.author),
     wells: (b) => /Ida B\. Wells/.test(b.author),
@@ -296,14 +320,25 @@
     washington: (b) => /Booker T\. Washington/.test(b.author),
     bailey: (b) => b.id === 'douglass-narrative' || b.id === 'douglass-bondage',
     robeson: (b) => b.id === 'shakespeare-othello' || /spiritual|Religious Folk-Songs|^Slave Songs/i.test(b.title),
-    malcolm: (b) => /^(dubois-souls|stowe-uncle-tom|kemble-journal|turner-confessions)$/.test(b.id) || /Negro in Our History/.test(b.title) || /Herodotus|Olmsted/.test(b.author),
-    king: (b) => /^(thoreau-walden|marx-manifesto)$/.test(b.id) || /^(Plato|Aristotle|John Stuart Mill|Walter Rauschenbusch|Mohandas K\. Gandhi|M\. K\. Gandhi)$/.test(b.author)
+    // Hubert Harrison: his own two books; Darwin, from his 1918 list of books every reader should know (When Africa
+    // Awakes, ch. VIII); and the books he reviewed, 1920-23 (the Negro World and elsewhere, dated in Columbia's
+    // finding aid for his papers): Darkwater (with The Souls of Black Folk weighed against it), Plaatje, Hunton and
+    // Johnson, Grimke's Rachel, Harlem Shadows, Woodson's church history, Johnson's anthology of Negro poetry
+    harrison: (b) => /Hubert H\. Harrison/.test(b.author) || /^(darwin-origin|darwin-descent|dubois-darkwater|dubois-souls|plaatje-native-life|hunton-johnson-aef|grimke-rachel|mckay-harlem-shadows|woodson-church|johnson-negro-poetry)$/.test(b.id),
+    // Marcus Garvey: Up from Slavery ("The Negro's Greatest Enemy", Current History, 1923), and the Bible he quotes
+    // on Ethiopia stretching forth her hands (Psalm 68:31, in Philosophy and Opinions, 1923)
+    garvey: (b) => /Marcus Garvey/.test(b.author) || /^(washington-up-from-slavery|kjv-bible)$/.test(b.id),
+    // Kwame Nkrumah: the Bible of his 1942 degree in theology; Marx, whom he names among the writers he studied in
+    // America (Ghana, 1957). Garvey's Philosophy and Opinions, which he said inspired him most, is not yet here.
+    nkrumah: (b) => /^(kjv-bible|marx-manifesto)$/.test(b.id),
+    // Walter Rodney: the Manifesto, cited in his 1972 essay on Tanzanian ujamaa
+    rodney: (b) => b.id === 'marx-manifesto'
   };
   const ownBooks = (av) => { const f = OWN[av]; return f ? S.books.filter(f).map(b => b.id) : []; };
   function paintOwn() { if (S.gl && W.setOwn) W.setOwn(ownBooks(S.me.avatar)); }
-  // Malcolm X, Martin Luther King Jr. and Kwame Ture (young, as Stokely Carmichael, and old) are met by reading:
-  // ten books taken down, and one read to the end
-  const HIDDEN = new Set(['malcolm', 'king', 'carmichael', 'ture']);
+  // Kwame Nkrumah, Kwame Ture (young, as Stokely Carmichael, and old) and Walter
+  // Rodney are met by reading: ten books taken down, and one read to the end
+  const HIDDEN = new Set(['nkrumah', 'carmichael', 'ture', 'rodney']);
   const MALCOLM = { taken: 10, done: 1 };
   const malcolmProgress = () => ({ taken: S.taken.size, done: RD.stats().books });
   function malcolmOpen() { const p = malcolmProgress(); return !!store.load('malcolm', false) || (p.taken >= MALCOLM.taken && p.done >= MALCOLM.done); }
@@ -312,12 +347,25 @@
     const p = malcolmProgress();
     if (p.taken < MALCOLM.taken || p.done < MALCOLM.done) return;
     store.save('malcolm', true);
-    toast('You have taken down ten books and read one to the end. New readers can now be chosen on the title page: Malcolm X, who educated himself in a prison library, copying out the dictionary page by page; Martin Luther King Jr., who entered Morehouse College at fifteen and first read Thoreau there; and Kwame Ture, as the young Stokely Carmichael and in his last years in Guinea.', 14000);
+    toast('You have taken down ten books and read one to the end. New readers can now be chosen on the title page: Kwame Nkrumah, the "avid reader" of his Lincoln University yearbook; Kwame Ture, as the young Stokely Carmichael and in his last years in Guinea; and Walter Rodney, the historian of Africa who taught at Dar es Salaam.', 16000);
     buildWho();
   }
 
   /* ---------------- world sync ---------------- */
   let myAv = null, fpHolder = null, camera, renderer, scene;
+  // books the room says are on a shelf or a table that is not there (a piece lost from a saved room, a spot or a
+  // row that no longer exists) would be counted but never drawn: they go back to their own shelves
+  function rehome(room) {
+    const lost = [];
+    for (const r in room.rows) if (!W.rowInfo(r) && room.rows[r].length) { lost.push(...room.rows[r]); delete room.rows[r]; }
+    for (const f in room.piles) {
+      const info = W.furnInfo(f);
+      for (const sp in room.piles[f]) if (!info || !info.spots[sp]) { lost.push(...room.piles[f][sp]); delete room.piles[f][sp]; }
+      if (!info) delete room.piles[f];
+    }
+    lost.forEach(id => returnBook(room, id));
+    return lost.length;
+  }
   function syncFurniture() {
     const want = new Map(S.room.furniture.map(f => [f.id, f]));
     for (const id of [...W.furn.keys()]) if (!want.has(id) && id !== '_carry') W.despawn(id);
@@ -422,9 +470,14 @@
       return;
     }
     if (S.mode === 'title') return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;     // the browser's and the system's shortcuts are theirs (Cmd+C is not the catalog)
     const k = e.key.toLowerCase();
+    // Enter and Space on a focused button press that button; nothing else should happen too
+    const ae = document.activeElement;
+    if ((k === 'enter' || k === ' ') && ae && ae !== cvs && ae.matches && ae.matches('button, a[href], summary, select, [role="button"]')) return;
     keys.add(e.code);
-    if (k === 'tab') { e.preventDefault(); toggleArrange(); return; }
+    if (k === 'b') { toggleArrange(); return; }       // Tab stays the keyboard's way between controls
+    if (e.key === '?') { openSheet('help'); return; }
     if (k === 'escape' && Z.target > 1 && !(S.mode === 'arrange' && ARR.carry)) { zoomTo(1); return; }
     if (k === 'escape') { if (S.mode === 'arrange') { if (ARR.carry) cancelCarry(); else toggleArrange(false); } else if (P.seat) standUp(); return; }
     if (k === 'c') { openCatalog(); return; }
@@ -448,7 +501,8 @@
     if (k === 'r' && S.room.hands[S.pid]) { readNow(S.room.hands[S.pid]); return; }
     if (k === ' ' && P.seat) { e.preventDefault(); standUp(); }
   });
-  window.addEventListener('keyup', (e) => keys.delete(e.code));
+  // macOS sends no keyup for a letter released while Cmd is down: let go of everything when Cmd is let go
+  window.addEventListener('keyup', (e) => { if (e.key === 'Meta') keys.clear(); else keys.delete(e.code); });
   window.addEventListener('blur', () => keys.clear());
 
   cvs.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -460,7 +514,7 @@
       if (!stick && e.clientX < innerWidth * 0.42 && e.clientY > innerHeight * 0.3) {
         // the thumb's corner: dragging walks, a quick tap still takes a book or sits (endPointer)
         stick = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, moved: false, t: performance.now() };
-      } else if (!lookTouch) lookTouch = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, t: performance.now() };
+      } else if (!lookTouch) lookTouch = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, t: performance.now(), cand: !!(stick && !stick.moved) };
       else if (!pinch) {                                 // a second finger: pinch to zoom
         pinch = { id: e.pointerId, x: e.clientX, y: e.clientY, d0: Math.max(30, Math.hypot(e.clientX - lookTouch.x, e.clientY - lookTouch.y)), z0: Z.target };
         lookTouch.moved = true;                          // a pinch is never a tap
@@ -473,8 +527,10 @@
   cvs.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'touch') { mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = true; }
     if (stick && e.pointerId === stick.id) {
+      stick.cx = e.clientX; stick.cy = e.clientY;
       let dx = e.clientX - stick.x0, dy = e.clientY - stick.y0; const d = Math.hypot(dx, dy), m = 50;
       if (!stick.moved) {
+        if (maybePinch()) return;
         if (d < 12) return;
         stick.moved = true;
         const st = $('#stick'); st.style.display = 'block'; st.style.left = stick.x0 + 'px'; st.style.top = stick.y0 + 'px';
@@ -496,9 +552,27 @@
     if (!L) return;
     const dx = e.clientX - L.x, dy = e.clientY - L.y;
     L.x = e.clientX; L.y = e.clientY;
+    if (L === lookTouch && maybePinch()) return;
     if (!L.moved && Math.hypot(e.clientX - L.sx, e.clientY - L.sy) > (e.pointerType === 'touch' ? 14 : 6)) L.moved = true;
     if (L.moved) look(dx, dy, e.pointerType === 'touch' ? 0.0062 : 0.0045);
   });
+  // Two fingers down, the first in the walking corner: walking with one thumb and looking with the other, or a pinch
+  // to zoom? How they move says: a pinch moves both fingers, toward or away from each other; walking and looking
+  // move them each their own way. Until the corner finger has moved enough to walk, a pinch can still take over.
+  function maybePinch() {
+    if (!stick || stick.moved || !lookTouch || !lookTouch.cand || pinch) return false;
+    const cx = stick.cx != null ? stick.cx : stick.x0, cy = stick.cy != null ? stick.cy : stick.y0;
+    const ax = cx - stick.x0, ay = cy - stick.y0, bx = lookTouch.x - lookTouch.sx, by = lookTouch.y - lookTouch.sy;
+    if (Math.hypot(ax, ay) < 6 || Math.hypot(bx, by) < 6) return false;
+    const ux = lookTouch.sx - stick.x0, uy = lookTouch.sy - stick.y0, ul = Math.hypot(ux, uy) || 1;
+    const pa = (ax * ux + ay * uy) / ul, pb = (bx * ux + by * uy) / ul;     // each finger's travel along the line between them
+    if (pa * pb >= 0) { lookTouch.cand = false; return false; }              // the same way: walking and looking
+    pinch = { id: lookTouch.id, x: lookTouch.x, y: lookTouch.y, d0: Math.max(30, Math.hypot(lookTouch.sx - stick.x0, lookTouch.sy - stick.y0)), z0: Z.target };
+    lookTouch = { id: stick.id, x: cx, y: cy, sx: stick.x0, sy: stick.y0, moved: true, t: performance.now() };
+    stick = null; $('#stick').style.display = 'none'; $('#stick i').style.transform = '';
+    zoomTo(pinch.z0 * Math.hypot(pinch.x - cx, pinch.y - cy) / pinch.d0, (pinch.x + cx) / 2, (pinch.y + cy) / 2);
+    return true;
+  }
   function endPointer(e) {
     if (stick && e.pointerId === stick.id) {
       const tap = !stick.moved && e.type === 'pointerup' && performance.now() - stick.t < 450;
@@ -518,6 +592,10 @@
   }
   cvs.addEventListener('pointerup', endPointer);
   cvs.addEventListener('pointercancel', endPointer);
+  // a finger's tap is handled on pointerup; the browser's emulated mouse events and click that follow it would land on
+  // whatever the tap just opened (the film's window: the click paused the film for the whole room). The room never
+  // needs them, so a touch ends here.
+  cvs.addEventListener('touchend', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
   cvs.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') mouse.in = false; });
   cvs.addEventListener('wheel', (e) => {
     if (S.mode === 'arrange' && ARR.carry) { e.preventDefault(); rotateCarry(e.deltaY > 0 ? 1 : -1); return; }
@@ -659,7 +737,7 @@
     if (t.kind === 'seat' || t.kind === 'fseat') {
       const taken = seatTaken(t.seat.key);
       if (P.seat && P.seat.key === t.seat.key) return out;
-      if (taken) { t.label = taken + ' is sitting here'; return out; }
+      if (taken) { t.label = esc(taken) + ' is sitting here'; return out; }
       out.push({ label: hb ? (listens() ? 'Sit and listen' : 'Sit and read') : 'Sit', key: 'E', fn: () => act(t, () => sit(t.seat)) });
       t.label = 'The ' + t.seat.name;
       return out;
@@ -723,7 +801,7 @@
   function tapAt(x, y) {
     if (S.mode === 'arrange') {
       aimFrom(x, y);
-      if (ARR.carry && touch) {                       // on a phone: the tap says where it goes
+      if (ARR.carry && tch()) {                       // on a phone: the tap says where it goes
         if (ray.ray.intersectPlane(floorPlane, _fp)) { ARR.carry.f.x = _fp.x; ARR.carry.f.z = _fp.z; W.place(ARR.carry.f); ARR.carry.ok = placementOK(ARR.carry.f, ARR.carry.id); }
         placeCarry(); return;
       }
@@ -731,7 +809,7 @@
     }
     if (S.mode !== 'play') return;
     let t = resolve(W.pick(aimFrom(x, y), 'play', 40));
-    if (touch && !actsFor(t).length) t = nearBook(x, y) || t;
+    if (tch() && !actsFor(t).length) t = nearBook(x, y) || t;
     target = t;
     const acts = actsFor(t);
     if (acts.length) { acts[0].fn(); return; }
@@ -750,8 +828,8 @@
   }
   function updateTarget() {
     if (S.mode !== 'play') return;
-    if (touch && Z.level <= 1.05) { paintBar(); return; }
-    const x = mouse.in && !touch ? mouse.x : innerWidth / 2, y = mouse.in && !touch ? mouse.y : innerHeight / 2;
+    if (tch() && Z.level <= 1.05) { paintBar(); return; }
+    const x = mouse.in && !tch() ? mouse.x : innerWidth / 2, y = mouse.in && !tch() ? mouse.y : innerHeight / 2;
     if (drag && drag.moved) { paintBar(); return; }
     const t = resolve(W.pick(aimFrom(x, y), 'play', 14));
     target = t && t.kind !== 'floor' ? t : null;
@@ -762,7 +840,7 @@
       else if (target.kind === 'book') W.highlight(W.bookMesh(target.id));
       else if (target.kind === 'seat' && target.f) W.highlight(W.furnInfo(target.f).obj);
       else if (target.kind === 'fseat') W.highlight({ box: new T.Box3().setFromCenterAndSize(new T.Vector3(target.seat.x, 0.35, target.seat.z), new T.Vector3(0.6, 0.6, 0.6)) });
-      else W.highlight(target.object);
+      else W.highlight(CN && target.kind === 'cinema' && CN.quietGlow(target) ? null : target.object);
     } else if (S.findId && W.bookMesh(S.findId) && W.bookMesh(S.findId).parent) W.highlight(W.bookMesh(S.findId));
     else W.highlight(null);
     document.body.classList.toggle('mouse-hover', mouse.in);
@@ -812,7 +890,15 @@
     if (!P.seat) return;
     const s = P.seat; P.seat = null;
     const fx = Math.sin(s.ry), fz = Math.cos(s.ry);
-    const p = collide(s.x + fx * 0.6, s.z + fz * 0.6, 0.28);
+    // step out in front of the seat, to the first place with room to walk away from (the middle of a sofa
+    // faces a low table: straight ahead can be a gap too tight to get out of)
+    let p = collide(s.x + fx * 0.6, s.z + fz * 0.6, 0.28);
+    if (W.clearAt(p.x, p.z) < 0.3) {
+      outer: for (const d of [0.6, 0.85, 1.1, 1.35]) for (const side of [0, 0.45, -0.45, 0.9, -0.9]) {
+        const q = collide(s.x + fx * d + fz * side, s.z + fz * d - fx * side, 0.28);
+        if (W.clearAt(q.x, q.z) >= 0.3) { p = q; break outer; }
+      }
+    }
     P.x = p.x; P.z = p.z; P.eye = 1.62;
     if (!quiet) sound('stand');
     barKey = '';
@@ -848,7 +934,7 @@
 
   /* ---------------- views ---------------- */
   function toggleView() {
-    S.view = S.view === 'first' ? 'third' : 'first';
+    S.view = S.view === 'first' ? 'third' : 'first'; store.save('viewChosen', true);
     $('#bView').setAttribute('aria-pressed', S.view === 'third' ? 'true' : 'false');
     relayout(); savePos();
     toast(S.view === 'third' ? 'Third person — you can see yourself.' : 'First person.', 1400);
@@ -903,8 +989,8 @@
   const _fp = new T.Vector3();
   function updateCarry() {
     const c = ARR.carry; if (!c) return;
-    if (touch) { W.place(c.f); c.ok = placementOK(c.f, c.id); W.highlight(W.furnInfo(c.id).obj, !c.ok); return; }
-    const x = touch ? innerWidth / 2 : (mouse.in ? mouse.x : innerWidth / 2), y = touch ? innerHeight * 0.62 : (mouse.in ? mouse.y : innerHeight / 2);
+    if (tch()) { W.place(c.f); c.ok = placementOK(c.f, c.id); W.highlight(W.furnInfo(c.id).obj, !c.ok); return; }
+    const x = tch() ? innerWidth / 2 : (mouse.in ? mouse.x : innerWidth / 2), y = tch() ? innerHeight * 0.62 : (mouse.in ? mouse.y : innerHeight / 2);
     aimFrom(x, y);
     if (ray.ray.intersectPlane(floorPlane, _fp)) {
       let dx = _fp.x - P.x, dz = _fp.z - P.z; const d = Math.hypot(dx, dz);
@@ -948,14 +1034,14 @@
     const c = ARR.carry;
     if (c) {
       $('#prompt').innerHTML = `Carrying the <i>${esc(W.CATALOG[c.f.type].name.toLowerCase())}</i>`;
-      add('Set it down', touch ? '' : 'Click', placeCarry, true); add('Turn', 'Q', () => rotateCarry(-1)); add('Turn', 'E', () => rotateCarry(1));
+      add('Set it down', tch() ? '' : 'Click', placeCarry, true); add('Turn', 'Q', () => rotateCarry(-1)); add('Turn', 'E', () => rotateCarry(1));
       add(c.isNew ? 'Never mind' : 'Put it back', 'Esc', cancelCarry);
       if (!c.isNew) add('Put away', 'Del', putAway);
     } else {
       const f = ARR.hover && W.furnInfo(ARR.hover);
-      $('#prompt').innerHTML = f ? `The <i>${esc(f.def.name.toLowerCase())}</i>` : (touch ? 'Tap a piece of furniture to move it' : 'Point at a piece of furniture to move it');
-      if (f) { add('Move', touch ? '' : 'Click', () => pickUp(ARR.hover), true); add('Put away', 'Del', putAway); }
-      add('Done', 'Tab', () => toggleArrange(false));
+      $('#prompt').innerHTML = f ? `The <i>${esc(f.def.name.toLowerCase())}</i>` : (tch() ? 'Tap a piece of furniture to move it' : 'Point at a piece of furniture to move it');
+      if (f) { add('Move', tch() ? '' : 'Click', () => pickUp(ARR.hover), true); add('Put away', 'Del', putAway); }
+      add('Done', 'B', () => toggleArrange(false));
     }
     barKey = k;
   }
@@ -1034,15 +1120,19 @@
     } else { P.vx = P.vz = 0; P.speed = 0; }
     P.eyeNow += (P.eye - P.eyeNow) * Math.min(1, dt * 6);
   }
+  let camK = 1, camNear = false;                       // how far back the third-person camera may sit (0..1), and whether it is too close
+  // a device set to reduce motion gets a still title view and no bob in the walk
+  const calm = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   function updateCamera(dt, t) {
     if (S.mode === 'title') {
+      if (calm) t = 14;
       const a = t * 0.045;
       camera.position.set(Math.sin(a) * 3.2, 2.1 + Math.sin(t * 0.13) * 0.2, 1.4 + Math.cos(a) * 1.6);
       camera.lookAt(Math.sin(a * 0.7) * 1.5, 1.4, -6);
       return;
     }
     updateZoom(dt);
-    const bob = P.seat ? 0 : Math.sin(P.bob * 2) * 0.025 * Math.min(1, P.speed / 2) / Z.level;
+    const bob = P.seat || calm ? 0 : Math.sin(P.bob * 2) * 0.025 * Math.min(1, P.speed / 2) / Z.level;
     if (S.view === 'first' || Z.blend >= 1) {
       camera.position.set(P.x, P.eyeNow + bob, P.z);
       camera.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
@@ -1050,6 +1140,11 @@
       const head = (myAv ? myAv.height : 1.75) * (P.seat ? 0.62 : 0.92);
       const dist = 2.7, cp = Math.cos(P.pitch), sp = Math.sin(P.pitch);
       let cx = P.x + Math.sin(P.yaw) * dist * cp, cz = P.z + Math.cos(P.yaw) * dist * cp, cy = head - sp * dist + 0.35;
+      // nothing between the head and the camera: it comes in at once when something is in the way, and eases back out
+      const hy = head + 0.1, k = W.camReach(P.x, hy, P.z, cx, cy, cz, 0.22);
+      camK = k < camK ? k : camK + (k - camK) * Math.min(1, dt * 2.5);
+      cx = P.x + (cx - P.x) * camK; cy = hy + (cy - hy) * camK; cz = P.z + (cz - P.z) * camK;
+      camNear = camK * dist < 0.7;                       // too close to see past your own head: it steps aside
       ({ x: cx, y: cy, z: cz } = W.clampCam(cx, cy, cz));
       camera.position.set(cx, cy, cz);
       camera.lookAt(P.x, head + 0.1, P.z);
@@ -1065,7 +1160,7 @@
   const _v3 = new T.Vector3();
   function updateMyAvatar(dt) {
     if (!myAv) return;
-    myAv.root.visible = S.view === 'third' && S.mode !== 'title' && Z.blend < 0.55;
+    myAv.root.visible = S.view === 'third' && S.mode !== 'title' && Z.blend < 0.55 && !camNear;
     myAv.root.position.set(P.x, P.seat ? 0 : 0, P.z);
     if (P.seat) { myAv.root.position.set(P.seat.x, 0, P.seat.z); myAv.root.rotation.y = P.seat.ry; }
     else if (P.speed > 0.2) { const want = Math.atan2(P.vx, P.vz); let da = ((want - myAv.root.rotation.y + Math.PI) % TAU + TAU) % TAU - Math.PI; myAv.root.rotation.y += da * Math.min(1, dt * 10); }
@@ -1163,7 +1258,7 @@
     // the saved library moved on without us (we missed a change): catch up where we stand
     syncRoom(room) {
       const r = sanitizeRoom(room); if (!r) return;
-      S.room = upgradeRoom(r); syncFurniture(); relayout();
+      S.room = upgradeRoom(r); syncFurniture(); rehome(S.room); relayout();
     },
     // a guest receives the host's room: put yours aside, step into theirs
     enterRoom(room, hostPid) {
@@ -1174,13 +1269,14 @@
       if (P.seat) standUp(true);
       S.room = sanitizeRoom(room) || S.room;
       if (S.commons) upgradeRoom(S.room);            // the same on every page, so everyone's copy stays the same
-      syncFurniture(); relayout();
+      syncFurniture(); rehome(S.room); relayout();
       // arrive at the door of their room
       const p = collide(S.commons ? (Math.random() - 0.5) * 1.6 : 0, 6.6, 0.28); P.x = p.x; P.z = p.z; P.yaw = 0;
       chatLine('', S.commons ? 'You walk into the shared library. Everyone who opens this page walks in here with you, and the library stays as you all leave it.' : 'You walk into the room.', true);
     },
     remoteOp(op) { const res = applyOp(S.room, op); if (res === true) { if (op.t === 'fadd' || op.t === 'fdel' || op.t === 'fmove') syncFurniture(); relayout(); sound(op.t, op.who !== S.pid); if (op.who === S.pid) afterMyOp(op); } else if (op.who === S.pid) toast(res); return res; },
-    hostOp(op) { return runOp(op); },
+    hostOp(op) { if (op && op.t === 'screen') { delete op.at; delete op.seq; } return runOp(op); },   // a guest's change is stamped here, by the pen
+    clockChanged() { if (CN && CN.reclock) CN.reclock(); },
     rejected(reason) { toast(reason); },
     peer(pid, data) { if (pid !== S.pid) upsertOther(pid, data); },
     peerLeft(pid, name) { removeOther(pid); chatLine('', (name || 'A reader') + ' left.', true); if (S.sheet === 'invite') paintInvite(); },
@@ -1343,11 +1439,18 @@
     $('#catFoot').textContent = n ? `${S.books.length} books, all U.S. public domain. On the shelves, the gilt cloth spines along the east wall and the leather spines with dark labels on the north wall are these books; the plain old volumes are the room's own.` : 'Nothing matches that.';
   }
   $('#q').addEventListener('input', paintCatalog);
+  // Escape in the search box clears it first, then closes the catalog
+  $('#q').addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; e.preventDefault(); if ($('#q').value) { $('#q').value = ''; paintCatalog(); } else closeSheets(); });
   function findBook(id) {
     const l = locate(S.room, id); if (!l) return;
     if (l.k === 'hand') { toast(whereIs(id) + '.'); return; }
     const m = W.bookMesh(id); if (!m) return;
     const wp = new T.Vector3(); m.getWorldPosition(wp);
+    const ri = l.k === 'row' ? W.rowInfo(l.row) : null;
+    if (ri && ri.area === 'hall' && !(S.room.doors || {}).hall) {   // nobody can walk there yet
+      toast(S.byId.get(id).short + ' is in the Great Hall. Its doors, on the south wall across from the fire, open ' + (S.shared && !S.isHost ? 'as the host of this room reads.' : 'when you finish your first chapter.'), 4200);
+      return;
+    }
     S.findId = id; S.findT = 10;
     if (P.seat) standUp(true);
     // walk to a spot in front of it, then face it
@@ -1494,6 +1597,60 @@
       else im.onerror = () => { im.onerror = null; redraw(); };
     });
   }
+  /* ---------------- the first walk: each reader is led to a book of their own; it advances as you really do it ---------------- */
+  const TOUR = {
+    wheatley: ['wheatley-poems', 'Your own book: the poems you published in 1773.'],
+    bailey: ['douglass-bondage', 'Your son’s autobiography, where he remembers you.'],
+    jacobs: ['jacobs-incidents', 'Your own book, the story of your years in hiding.'],
+    douglass: ['douglass-narrative', 'Your own autobiography, from 1845.'],
+    washington: ['washington-up-from-slavery', 'Your own autobiography.'],
+    wells: ['wells-red-record', 'Your own record of lynching in America.'],
+    dubois: ['dubois-souls', 'Your own book.'],
+    robeson: ['shakespeare-othello', 'The play you took to the London stage in 1930.'],
+    harrison: ['harrison-africa-awakes', 'Your own book of 1920, with your list of the books every reader should read for themselves.'],
+    garvey: ['washington-up-from-slavery', 'After you read it in London, you wrote in 1923, your “doom” of being a race leader dawned on you.'],
+    nkrumah: ['marx-manifesto', 'Your own books are still under copyright. You named Marx among the writers you studied in America.'],
+    rodney: ['marx-manifesto', 'Your own books are still under copyright. In a 1972 essay written at Dar es Salaam, you cited the Manifesto.'],
+    carmichael: ['harrison-negro-nation', 'Your own books are still under copyright. Begin with Hubert Harrison, a Caribbean-born Harlem radical of an earlier day.'],
+    ture: ['harrison-africa-awakes', 'Your own books are still under copyright. Begin with Hubert Harrison on Africa and its people.']
+  };
+  let tour = null, tourT = 0;
+  function startTour() {
+    const av = S.me.avatar, t = TOUR[av];
+    if (!t || !S.gl || !S.byId.has(t[0]) || store.load('tour-' + av, false)) return false;
+    tour = { av, id: t[0], why: t[1], step: 'intro' };
+    clearInterval(tourT); tourT = setInterval(tourTick, 300);
+    paintTour();
+    return true;
+  }
+  function endTour() { if (tour) store.save('tour-' + tour.av, true); tour = null; clearInterval(tourT); $('#tour').hidden = true; if (S.mode === 'play') cvs.focus({ preventScroll: true }); }
+  const inHall = (id) => /^(novel|epic|thought)$/.test(S.byId.get(id).sec) && !(S.room.doors || {}).hall;
+  function tourTick() {
+    if (!tour) return;
+    const l = locate(S.room, tour.id), mine = l && l.k === 'hand' && l.p === S.pid, was = tour.step;
+    if (S.mode === 'reader') { if (tour.step !== 'done') tour.step = 'reading'; }
+    else if (tour.step === 'reading') tour.step = 'done';
+    else if (tour.step !== 'done' && mine) tour.step = 'read';
+    else if (tour.step === 'walking' && !P.walkTo) tour.step = 'take';
+    if (tour.step !== was) paintTour();
+  }
+  function paintTour() {
+    const el = $('#tour'), b = S.byId.get(tour.id), away = inHall(tour.id);
+    const STEP = {
+      intro: ['Your first book: ' + b.short, tour.why + (away ? ' It stands in the Great Hall, whose doors open when you finish a chapter, so you can open it from here.' : ''), away ? ['Open it', () => readNow(tour.id)] : ['Walk me there', () => { tour.step = 'walking'; findBook(tour.id); paintTour(); }]],
+      walking: ['Walking to ' + b.short, touch ? 'From now on, tap the floor or use your left thumb to walk.' : 'From now on, click the floor or use WASD to walk.', null],
+      take: ['Take it down', (touch ? 'Tap' : 'Click') + ' the book, or use the button.', ['Take it down', () => { if (doOp({ t: S.room.hands[S.pid] ? 'swap' : 'take', id: tour.id }) !== true) readNow(tour.id); }]],
+      read: ['It is in your hands', 'Open it and read. Your place is saved. Close it when you are ready.', ['Read it', () => readNow(tour.id)]],
+      reading: null,
+      done: ['The room is yours', 'Your own books glow for you. The Catalog finds any book and walks you to it, and finishing a chapter opens the doors to the Great Hall. The lit shelves hold the narratives.', ['Done', endTour]]
+    }[tour.step];
+    el.hidden = !STEP; if (!STEP) return;
+    el.innerHTML = '<b></b><p></p><div><button type="button" class="big" id="tourGo"></button><button type="button" class="link" id="tourSkip">Skip</button></div>';
+    el.querySelector('b').textContent = STEP[0]; el.querySelector('p').textContent = STEP[1];
+    const go = el.querySelector('#tourGo');
+    if (STEP[2]) { go.textContent = STEP[2][0]; go.onclick = STEP[2][1]; } else go.hidden = true;
+    const sk = el.querySelector('#tourSkip'); sk.onclick = endTour; sk.hidden = tour.step === 'done';
+  }
   function enter() {
     const nm = $('#nm').value.trim().slice(0, 14) || defaultName();
     S.me.name = nm;
@@ -1508,7 +1665,8 @@
     resumeAudio();
     relayout();
     cvs.focus({ preventScroll: true });
-    if (!store.load('seenHelp', false)) { store.save('seenHelp', true); setTimeout(() => toast((touch ? 'Left thumb to walk, drag to look, tap a book to take it down.' : 'WASD to walk, drag to look, click a book to take it down. Press ? for more.') + ' The golden wall on your right holds the narratives of those who lived through slavery: follow the gilt runner and begin at the lit shelves.', 8000), 600); }
+    const touring = startTour();
+    if (!touring && !store.load('seenHelp', false)) { store.save('seenHelp', true); setTimeout(() => toast((touch ? 'Left thumb to walk, drag to look, tap a book to take it down.' : 'WASD to walk, drag to look, click a book to take it down. Press ? for more.') + ' The golden wall on your right holds the narratives of those who lived through slavery: follow the gilt runner and begin at the lit shelves.', 8000), 600); }
     const code = QS.get('room');
     if (!code) setTimeout(checkDoors, 1800);           // reading you did before these doors existed counts too
     if (!code && NET) NET.detect().then(ok => { S.canCommons = ok; if (ok && S.mode !== 'title' && !NET.state().active) NET.commons().then(() => setTimeout(checkDoors, 2500)); });
@@ -1523,7 +1681,7 @@
   const msg = (t) => { $('#loadmsg').textContent = t; };
   function makeRenderer() {
     try {
-      const r = new T.WebGLRenderer({ canvas: cvs, alpha: true, antialias: !touch || devicePixelRatio < 2, powerPreference: 'high-performance' });
+      const r = new T.WebGLRenderer({ canvas: cvs, alpha: true, antialias: true, powerPreference: 'high-performance' });
       r.outputColorSpace = T.SRGBColorSpace;
       r.toneMapping = T.ACESFilmicToneMapping; r.toneMappingExposure = 1.05;
       r.setPixelRatio(Math.min(devicePixelRatio || 1, touch ? 1.5 : 1.75));
@@ -1570,16 +1728,18 @@
     fpHolder = new T.Group(); fpHolder.userData.hand = true;
     fpHolder.position.set(0.24, -0.25, -0.52); fpHolder.rotation.set(0.25, -1.2, 0.08);
     camera.add(fpHolder);
-    if (CN) CN.init({ scene, camera, renderer, W, doOp, openSheet, closeSheets, toast, shared: () => S.shared, host: () => !S.shared || S.isHost, soundChanged: () => paintSound() });
+    if (CN) CN.init({ scene, camera, renderer, W, doOp, openSheet, closeSheets, toast, shared: () => S.shared, host: () => !S.shared || S.isHost, soundChanged: () => paintSound(), penNow: () => (NET && NET.penNow ? NET.penNow() : Date.now()) });
     // your room
     S.room = sanitizeRoom(store.load('room', null)) || defaultRoom();
     syncFurniture();
     upgradeRoom(S.room);
+    if (rehome(S.room)) saveRoomSoon();
     // a book held by an old player id (a shared visit that ended badly) goes back to a shelf
     for (const p in S.room.hands) if (p !== S.pid) applyOp(S.room, { t: 'drop', who: p });
     relayout();
     const pos = store.load('pos', null);
-    if (pos && typeof pos.x === 'number') { const p = collide(pos.x, pos.z, 0.28); P.x = p.x; P.z = p.z; P.yaw = pos.yaw || 0; P.pitch = pos.pitch || 0; if (pos.view === 'third') { S.view = 'third'; $('#bView').setAttribute('aria-pressed', 'true'); } }
+    if (pos && typeof pos.x === 'number') { const p = collide(pos.x, pos.z, 0.28); P.x = p.x; P.z = p.z; P.yaw = pos.yaw || 0; P.pitch = pos.pitch || 0; if (pos.view === 'first' && store.load('viewChosen', false)) S.view = 'first'; }
+    $('#bView').setAttribute('aria-pressed', S.view === 'third' ? 'true' : 'false');
     buildPalette();
     addEventListener('resize', onResize);
     if (NET) {
@@ -1600,7 +1760,7 @@
     const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)); last = now; clock += dt;
     if (S.mode === 'reader' && !S.shared) return;           // the book covers the room; let it rest
     step(dt);
-    if (S.mode === 'arrange') { if (ARR.carry) updateCarry(); else if (!touch) { aimFrom(mouse.in ? mouse.x : innerWidth / 2, mouse.in ? mouse.y : innerHeight / 2); arrangePick(); } }
+    if (S.mode === 'arrange') { if (ARR.carry) updateCarry(); else if (!tch()) { aimFrom(mouse.in ? mouse.x : innerWidth / 2, mouse.in ? mouse.y : innerHeight / 2); arrangePick(); } }
     if (fpHolder) fpHolder.visible = S.mode !== 'title';
     updateCamera(dt, clock);
     if (S.mode === 'play') updateTarget();
@@ -1611,7 +1771,7 @@
     updateAudio();
     posT += dt; if (posT > 3 && S.mode !== 'title') { posT = 0; savePos(); }
     netT += dt; if (S.shared && netT > 0.1) { netT = 0; NET.presence(myPresence()); }
-    if (S.mode !== 'reader') { renderer.render(scene, camera); if (CN) CN.afterRender(); }   // a film shown over the canvas follows this frame
+    if (S.mode !== 'reader') { if (CN) CN.beforeRender(); renderer.render(scene, camera); if (CN) CN.afterRender(); }   // a film behind the canvas is placed for this frame
   }
   addEventListener('pagehide', () => { if (S.ready && S.room && S.mode !== 'title') { savePos(); if (!S.shared || (S.isHost && !S.commons)) store.save('room', S.room); } });
 
@@ -1627,6 +1787,6 @@
   $('#bHelp').onclick = () => openSheet('help');
 
   // a small window for tests and the console: read-only views plus a couple of helpers
-  window.RR = { S, P, store, sim: (n, dt) => { for (let i = 0; i < n; i++) step(dt || 0.05); updateCamera(0.016, clock); return { x: +P.x.toFixed(2), z: +P.z.toFixed(2), walking: !!P.walkTo }; }, tapAt: (x, y) => tapAt(x, y), screenOf: (id) => { const m = W.bookMesh(id); if (!m || !m.parent) return null; const v = new T.Vector3(); m.getWorldPosition(v); v.project(camera); return { x: Math.round((v.x * 0.5 + 0.5) * innerWidth), y: Math.round((-v.y * 0.5 + 0.5) * innerHeight) }; }, pickAt: (x, y) => { const t = resolve(W.pick(aimFrom(x, y), 'play', 40)); return t && { kind: t.kind, id: t.id, row: t.row, f: t.f, s: t.s, dist: +(t.dist || 0).toFixed(2), acts: actsFor(t).map(a => a.label) }; }, applyOp, locate, defaultRoom, doOp, sit, standUp, readNow, toggleArrange, spawnNew, openCatalog, findBook, enter, checkDoors, unlock: (door) => doOp({ t: 'unlock', door }), stats: () => RD.stats(), W, Z, sound: () => ({ fire: snd.fire, room: snd.room, film: soundOn('film'), ac: AC ? AC.state : null, fireGain: fireG ? +fireG.gain.value.toFixed(3) : null, roomGain: roomG ? +roomG.gain.value.toFixed(3) : null }), setSound, soundMenu, zoom: (v) => { zoomTo(v); Z.level = Z.target; updateCamera(0.016, clock); return Z.level; }, frameOnce: () => { updateCamera(0.016, clock); renderer.render(scene, camera); const i = renderer.info.render; return { calls: i.calls, tris: i.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, progs: renderer.info.programs.length }; } };
+  window.RR = { S, P, store, sim: (n, dt) => { for (let i = 0; i < n; i++) step(dt || 0.05); updateCamera(0.016, clock); return { x: +P.x.toFixed(2), z: +P.z.toFixed(2), walking: !!P.walkTo }; }, tapAt: (x, y) => tapAt(x, y), screenOf: (id) => { const m = W.bookMesh(id); if (!m || !m.parent) return null; const v = new T.Vector3(); m.getWorldPosition(v); v.project(camera); return { x: Math.round((v.x * 0.5 + 0.5) * innerWidth), y: Math.round((-v.y * 0.5 + 0.5) * innerHeight) }; }, pickAt: (x, y) => { const t = resolve(W.pick(aimFrom(x, y), 'play', 40)); return t && { kind: t.kind, id: t.id, row: t.row, f: t.f, s: t.s, dist: +(t.dist || 0).toFixed(2), acts: actsFor(t).map(a => a.label) }; }, applyOp, locate, defaultRoom, doOp, sit, standUp, readNow, toggleArrange, spawnNew, openCatalog, findBook, enter, checkDoors, unlock: (door) => doOp({ t: 'unlock', door }), tour: () => tour && tour.step, stats: () => RD.stats(), W, Z, sound: () => ({ fire: snd.fire, room: snd.room, film: soundOn('film'), ac: AC ? AC.state : null, fireGain: fireG ? +fireG.gain.value.toFixed(3) : null, roomGain: roomG ? +roomG.gain.value.toFixed(3) : null }), setSound, soundMenu, zoom: (v) => { zoomTo(v); Z.level = Z.target; updateCamera(0.016, clock); return Z.level; }, alphaAt: (x, y) => { updateCamera(0.016, clock); if (CN) CN.beforeRender(); renderer.render(scene, camera); const gl = renderer.getContext(), b = new Uint8Array(4), d = renderer.getPixelRatio(); gl.readPixels(Math.round(x * d), Math.round(gl.drawingBufferHeight - y * d), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, b); return Array.from(b); }, frameOnce: () => { updateCamera(0.016, clock); if (CN) CN.beforeRender(); renderer.render(scene, camera); const i = renderer.info.render; return { calls: i.calls, tris: i.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, progs: renderer.info.programs.length }; } };
   boot();
 })();

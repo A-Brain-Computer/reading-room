@@ -19,7 +19,8 @@ const RR_READER = (() => {
   let cur = null;          // { meta, data, ch, page, pages, perView, words: [], total }
   let saveT = 0;
   const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const fmt = (s) => esc(s).replace(/_([^_]+?)_/g, '<em>$1</em>');
+  // _italic_; a run of underscores is a blank in the old printing ("Mr. ____"), never half of an italic
+  const fmt = (s) => esc(s).replace(/_{2,}/g, (m) => '\u0001'.repeat(m.length)).replace(/_([^_\u0001]+?)_/g, '<em>$1</em>').replace(/\u0001/g, '_');
   const plain = (blk) => typeof blk === 'string' ? blk : (blk.h || blk.v || blk.n || '');
   const words = (s) => (s.match(/\S+/g) || []).length;
 
@@ -34,13 +35,22 @@ const RR_READER = (() => {
     clearTimeout(saveT);
     saveT = setTimeout(() => { store.save('reading', reading); }, 300);
   }
+  // the place is kept at once when the book closes or the page goes away (a turn just before a reload stays turned)
+  function saveNow() { clearTimeout(saveT); store.save('reading', reading); }
+  addEventListener('pagehide', () => { if (cur && cur.data) remember(); saveNow(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { if (cur && cur.data) remember(); saveNow(); } });
   function saveNotes() { store.save('notes', notes); }
   function saveSet() { store.save('readset', set, true); }
 
   /* ---------------- open / close ---------------- */
   // listen: for a reader marked `listens` in avatars.js the book starts reading itself aloud
+  // the browser's Back (a phone's back gesture above all) closes the book, not the library: an open book is one
+  // step of the page's history. Closing it with the button takes that step back again, only if it is still ours.
+  let pushed = false;
+  addEventListener('popstate', () => { if (pushed) { pushed = false; if (cur) close(); } });
   async function open(meta, opts) {
     const el = $('#reader');
+    if (!pushed) { try { history.pushState({ rrBook: meta.id }, ''); pushed = true; } catch (e) { /* not allowed here */ } }
     el.hidden = false;
     document.body.classList.add('reading');
     el.className = set.theme;
@@ -78,6 +88,8 @@ const RR_READER = (() => {
   function close() {
     stopSpeaking();
     if (cur && cur.data) remember();
+    saveNow();
+    if (pushed) { pushed = false; try { if (history.state && history.state.rrBook) history.back(); } catch (e) {} }
     $('#reader').hidden = true;
     document.body.classList.remove('reading');
     selHide();
@@ -99,9 +111,17 @@ const RR_READER = (() => {
     const colW = (inner - (n - 1) * gap) / n;
     return { w, h, padX, padY, n, inner, gap, colW };
   }
+  let advancing = false;                                // the voice itself is moving on to the next chapter
   function show(ch, at) {
     if (!cur || !cur.data) return;
+    const listening = speaking && !advancing, was = { ch: cur.ch, b: spBlock };
     stopSpeaking(true);
+    try { return showPage(ch, at); } finally {
+      // the voice goes on from where it was (the same chapter laid out again), or from the top of the page you went to
+      if (listening && speaking) speakFrom(cur.ch === was.ch && was.b >= 0 ? was.b : firstBlockOnPage());
+    }
+  }
+  function showPage(ch, at) {
     cur.ch = Math.max(0, Math.min(cur.data.chapters.length - 1, ch));
     const C = cur.data.chapters[cur.ch];
     const g = geometry();
@@ -134,14 +154,14 @@ const RR_READER = (() => {
       const ns = byBlock.get(i) || [];
       if (typeof blk === 'string') {
         let html = fmt(blk);
-        ns.forEach(n => { if (n.quote) { const q = esc(n.quote); const k = html.indexOf(q); if (k >= 0) html = html.slice(0, k) + `<mark data-n="${n.id}">` + q + '</mark>' + html.slice(k + q.length); } });
+        ns.forEach(n => { if (n.quote) { const q = esc(n.quote); const k = html.indexOf(q); if (k >= 0) html = html.slice(0, k) + `<mark data-n="${esc(n.id)}">` + q + '</mark>' + html.slice(k + q.length); } });
         const cls = (firstP ? 'first' : '') + (ns.length ? ' annot' : '');
         out += `<p data-b="${i}"${cls.trim() ? ` class="${cls.trim()}"` : ''}>${html}</p>`;
         firstP = false;
       } else if (blk.h) out += `<h3 data-b="${i}">${fmt(blk.h)}</h3>`;
       else if (blk.v) out += `<div class="v" data-b="${i}">${fmt(blk.v)}</div>`;
       else if (blk.n) out += `<p class="fn" data-b="${i}">${fmt(blk.n)}</p>`;
-      ns.forEach(n => { out += `<span class="note" data-n="${n.id}">${n.by ? `<small>${esc(n.by)}</small>` : ''}${esc(n.text)}</span>`; });
+      ns.forEach(n => { out += `<span class="note" data-n="${esc(n.id)}">${n.by ? `<small>${esc(n.by)}</small>` : ''}${esc(n.text)}</span>`; });
     });
     const last = ci === cur.data.chapters.length - 1;
     out += last
@@ -375,7 +395,7 @@ const RR_READER = (() => {
     const C = cur.data.chapters[cur.ch];
     let i = b;
     while (i < C.b.length && !plain(C.b[i]).trim()) i++;
-    if (i >= C.b.length) { if (cur.ch < cur.data.chapters.length - 1) { finishChapter(cur.ch); show(cur.ch + 1, { page: 0 }); speakFrom(0); } else stopSpeaking(); return; }
+    if (i >= C.b.length) { if (cur.ch < cur.data.chapters.length - 1) { finishChapter(cur.ch); advancing = true; try { show(cur.ch + 1, { page: 0 }); } finally { advancing = false; } speakFrom(0); } else stopSpeaking(); return; }
     spBlock = i;
     document.querySelectorAll('#rcols .speaking').forEach(e => e.classList.remove('speaking'));
     const el = document.querySelector(`#rcols [data-b="${i}"]`);
@@ -420,7 +440,11 @@ const RR_READER = (() => {
     $('#rsCopy').onclick = async () => { const q = pending && pending.quote; selHide(); if (q) { try { await navigator.clipboard.writeText(q); } catch (e) {} } };
     $('#ndOk').onclick = keepNote; $('#ndX').onclick = () => { $('#noted').hidden = true; pending = null; };
     $('#ndDel').onclick = eraseNote;
-    $('#ndT').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) keepNote(); e.stopPropagation(); });
+    $('#ndT').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) keepNote();
+      else if (e.key === 'Escape') { $('#noted').hidden = true; pending = null; }
+      e.stopPropagation();
+    });
     const cols = $('#rcols');
     cols.addEventListener('click', (e) => {
       const endB = e.target.closest('[data-end]');
@@ -441,6 +465,7 @@ const RR_READER = (() => {
     // swipes turn pages
     let sw = null;
     $('#rview').addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') sw = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+    $('#rview').addEventListener('pointercancel', () => { sw = null; });
     $('#rview').addEventListener('pointerup', (e) => {
       if (!sw) return; const dx = e.clientX - sw.x, dy = e.clientY - sw.y; const quick = performance.now() - sw.t < 600; sw = null;
       const s = window.getSelection(); if (s && !s.isCollapsed) return;

@@ -7,12 +7,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>The Reading Room</title>
-<meta name="description" content="A walkable library of 409 free books. Begin with the slave narratives in their own words, then the radical tradition and Black history the world over. Read together: whoever opens the link walks into the same library.">
+<meta name="description" content="A walkable library of 421 free books. Begin with the slave narratives in their own words, then the radical tradition and Black history the world over. Read together: whoever opens the link walks into the same library.">
 <link rel="canonical" href="https://library.jordanstrudwick.com/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="The Reading Room">
 <meta property="og:title" content="The Reading Room">
-<meta property="og:description" content="A walkable library of 409 free books. Begin with the slave narratives in their own words, then the radical tradition and Black history the world over. Read together: whoever opens the link walks into the same library.">
+<meta property="og:description" content="A walkable library of 421 free books. Begin with the slave narratives in their own words, then the radical tradition and Black history the world over. Read together: whoever opens the link walks into the same library.">
 <meta property="og:url" content="https://library.jordanstrudwick.com/">
 <meta property="og:image" content="https://library.jordanstrudwick.com/og/preview.jpg">
 <meta property="og:image:width" content="1200">
@@ -41,18 +41,21 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hi
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer}
-#gl{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none;outline:none}
+#gl{position:fixed;inset:0;z-index:1;display:block;width:100%;height:100%;touch-action:none;outline:none}   /* above the film's <video> (#cineOver, z-index 0), which shows through the screen's picture */
 [hidden]{display:none!important}
 
 /* ---------- chips ---------- */
 .chip{appearance:none;border:1px solid var(--line);background:rgba(13,10,7,.72);color:var(--gold);border-radius:12px;padding:8px 11px;
   font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;min-height:40px;text-decoration:none;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-.chip:hover,.chip:focus-visible{border-color:var(--gold);outline:none}
+.chip:hover,.chip:focus-visible{border-color:var(--gold)}
 .chip svg{width:18px;height:18px;flex:none}
 .chip[aria-pressed="true"]{background:rgba(232,176,75,.2);border-color:var(--gold)}
 .chip .lbl{font-size:12px;letter-spacing:.04em}
 #home{position:fixed;z-index:30;left:calc(var(--sal) + 12px);top:calc(var(--sat) + 10px)}
 #tools{position:fixed;z-index:30;right:calc(var(--sar) + 12px);top:calc(var(--sat) + 10px);display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 120px)}
+body.playing #tools,body.playing #bar,body.playing #hud,body.playing #stick,body.playing #gl{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+/* iOS ignores the viewport's no-zoom: a pinch on the HUD must not zoom the page while you play (the reader still zooms) */
+body.playing:not(.reading){touch-action:pan-x pan-y} body.playing input[type=range]{touch-action:none}
 body:not(.playing) #tools,body.reading #tools,body.reading #home,body.reading #bar,body.reading #chat{display:none}
 @media (max-width:640px){ #tools .lbl{display:none} #tools{gap:5px} #tools .chip{padding:8px 9px} #home .lbl{display:none} }
 /* the speaker chip's menu: each sound on or off, for you alone */
@@ -107,7 +110,7 @@ body:not(.playing) #tools,body.reading #tools,body.reading #home,body.reading #b
 .row2{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:16px;
   position:sticky;bottom:calc(var(--sab) + 6px);z-index:2;padding:8px 12px;border-radius:20px;background:rgba(13,10,7,.82);box-shadow:0 8px 30px rgba(0,0,0,.5)}
 /* on a phone only the button is pinned (the row's box steps aside so the button can stick to the page itself) */
-@media (max-width:640px){ .row2{display:contents} .row2 .field{margin-top:16px} #go{position:sticky;bottom:calc(var(--sab) + 8px);z-index:2;margin-top:10px;width:min(100%,340px)} }
+@media (max-width:640px){ .row2{display:contents} .row2 .field{margin-top:16px} #go{position:sticky;bottom:calc(var(--sab) + 8px);z-index:2;margin-top:10px;width:min(100%,340px);box-shadow:0 0 0 10px rgba(13,10,7,.9),0 10px 30px rgba(0,0,0,.6)} .who{scroll-margin-bottom:100px} }
 .field{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:6px 10px;background:rgba(13,10,7,.6)}
 .field label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .field input{background:none;border:0;outline:none;width:140px;font-weight:700;color:var(--gold2);font-size:16px}
@@ -129,6 +132,12 @@ body:not(.playing) #tools,body.reading #tools,body.reading #home,body.reading #b
 #loadmsg{margin-top:10px;color:var(--dim);font-size:13px;min-height:18px;text-align:center}
 
 /* ---------- play HUD ---------- */
+#tour{position:fixed;left:50%;top:calc(var(--sat) + 60px);transform:translateX(-50%);z-index:44;width:min(420px,calc(100vw - 24px));background:rgba(13,10,7,.94);border:1px solid var(--gold);border-radius:14px;padding:12px 14px;text-align:center}
+#tour[hidden]{display:none}
+@media (max-width:360px){ #tour{top:calc(var(--sat) + 104px)} }   /* below the tools, which wrap to two rows this narrow */
+#tour b{display:block;font-family:var(--serif);font-size:18px;color:var(--gold2)}
+#tour p{margin:6px 0 10px;font-size:14.5px;line-height:1.4;color:var(--ink)}
+#tour .big{padding:8px 18px;min-height:44px;font-size:15px}
 #cross{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,240,210,.7);box-shadow:0 0 0 1.5px rgba(0,0,0,.5);z-index:5;pointer-events:none}
 body:not(.playing) #cross,body.touch #cross,body.mouse-hover #cross{display:none}
 body.playing.touch.zoomed #cross{display:block;width:10px;height:10px;margin:-5px 0 0 -5px;background:none;box-shadow:0 0 0 1.5px rgba(255,240,210,.85),0 0 0 3px rgba(0,0,0,.4)}
@@ -152,6 +161,11 @@ body.touch .act kbd{display:none}
 #toast{position:fixed;left:50%;top:calc(var(--sat) + 64px);transform:translate(-50%,-8px);z-index:45;background:rgba(13,10,7,.92);border:1px solid var(--line);color:var(--ink);
   border-radius:12px;padding:10px 16px;font-size:14px;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:min(560px,calc(100vw - 24px));text-align:center}
 #toast.on{opacity:1;transform:translate(-50%,0)}
+/* the keyboard's place is always plain to see */
+#chatin:focus,#q:focus{border-color:var(--gold)}
+button:focus-visible,a:focus-visible,[role="button"]:focus-visible,select:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.field:focus-within{border-color:var(--gold);box-shadow:0 0 0 2px rgba(232,176,75,.35)}
+@media (prefers-reduced-motion:reduce){ *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important} }
 #arrBanner{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--sat) + 60px);z-index:21;background:rgba(232,176,75,.95);color:#2a1606;font-weight:900;
   letter-spacing:.08em;font-size:12px;text-transform:uppercase;border-radius:999px;padding:6px 14px;pointer-events:none}
 #stick{position:fixed;z-index:15;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:2px solid rgba(232,176,75,.35);background:rgba(13,10,7,.25);pointer-events:none;display:none}
@@ -169,9 +183,11 @@ body.shared #chat{display:block}
 @media (min-width:761px){ body.shared #bar{left:calc(var(--sal) + 344px);right:12px;transform:none;max-width:none} }
 @media (max-width:760px){ body.shared #chat{bottom:calc(var(--sab) + 22px + var(--barh,52px))} body.shared #chatlog{max-height:64px} }
 #chatlog{max-height:150px;overflow-y:auto;font-size:13px;line-height:1.35;text-shadow:0 1px 2px #000;margin-bottom:6px;scrollbar-width:none}
+/* on a touch screen the chat's lines float over the walking corner: a thumb goes through them (they scroll while you type) */
+body.touch #chatlog{pointer-events:none} body.touch #chat:focus-within #chatlog{pointer-events:auto}
 #chatlog div b{color:var(--gold2)}
 #chatlog div.sys{color:var(--dim);font-style:italic}
-#chatin{width:100%;border:1px solid var(--line);background:rgba(13,10,7,.8);border-radius:10px;padding:8px 10px;outline:none;color:var(--ink);font-size:14px}
+#chatin{width:100%;border:1px solid var(--line);background:rgba(13,10,7,.8);border-radius:10px;padding:8px 10px;outline:none;color:var(--ink);font-size:16px}
 #chatin:focus{border-color:var(--gold)}
 @media (min-width:761px){ body.touch.shared #bar{bottom:calc(var(--sab) + 70px)} }
 
@@ -182,13 +198,14 @@ body.shared #chat{display:block}
 .card header h2{margin:0;font-family:var(--serif);font-weight:700;letter-spacing:.06em;color:var(--gold2);font-size:20px;flex:1}
 .x{appearance:none;border:1px solid var(--line);background:none;color:var(--ink);border-radius:10px;min-width:40px;min-height:40px;font-size:18px}
 .card .body{overflow-y:auto;padding:12px 16px 16px;-webkit-overflow-scrolling:touch}
-#q{width:100%;border:1px solid var(--line);background:rgba(0,0,0,.3);border-radius:10px;padding:10px 12px;outline:none;color:var(--ink);font-size:15px;margin-bottom:10px}
+#q{width:100%;border:1px solid var(--line);background:rgba(0,0,0,.3);border-radius:10px;padding:10px 12px;outline:none;color:var(--ink);font-size:16px;margin-bottom:10px}
 #q:focus{border-color:var(--gold)}
 .bk{display:grid;grid-template-columns:14px 1fr auto;gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid rgba(232,176,75,.12)}
 .bk .sp{width:14px;height:58px;border-radius:2px;box-shadow:inset -3px 0 0 rgba(0,0,0,.35),inset 0 4px 0 rgba(226,189,104,.7),inset 0 -4px 0 rgba(226,189,104,.7)}
 .bk .sp:not(.gilt){box-shadow:inset -3px 0 0 rgba(0,0,0,.35),inset 0 9px 0 rgba(226,189,104,.35),inset 0 -9px 0 rgba(226,189,104,.35)}
 .ctabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px}
-.ctab{appearance:none;border:1px solid var(--line);background:none;color:var(--dim);border-radius:999px;padding:5px 11px;font:inherit;font-size:13px;cursor:pointer}
+.ctab{appearance:none;border:1px solid var(--line);background:none;color:var(--dim);border-radius:999px;padding:5px 11px;font:inherit;font-size:13px;cursor:pointer;min-height:34px}
+body.touch .ctab{min-height:40px}
 .ctab small{opacity:.7;margin-left:3px}
 .ctab[aria-pressed="true"]{color:var(--gold);border-color:var(--gold);background:rgba(232,176,75,.12)}
 .csec{margin:18px 0 2px;font:700 13px/1.3 Georgia,serif;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
@@ -234,7 +251,7 @@ body.arranging #arrange{display:flex}
 #rbook{position:relative;flex:1;max-width:1180px;background:var(--rb);color:var(--ri);border-radius:6px;box-shadow:0 18px 50px rgba(0,0,0,.6),inset 0 0 60px rgba(120,80,30,.12);overflow:hidden}
 #rbook.spread:after{content:"";position:absolute;top:0;bottom:0;left:50%;width:40px;margin-left:-20px;pointer-events:none;
   background:linear-gradient(90deg,rgba(0,0,0,0),rgba(0,0,0,.10) 45%,rgba(0,0,0,.16) 50%,rgba(0,0,0,.10) 55%,rgba(0,0,0,0))}
-#rview{position:absolute;inset:0;overflow:hidden;contain:strict}
+#rview{position:absolute;inset:0;overflow:hidden;contain:strict;touch-action:pan-y}
 #rcols{height:100%;column-fill:auto;contain:layout style;font-family:var(--serif);font-size:var(--fs,19px);line-height:1.62;hyphens:auto;-webkit-hyphens:auto;text-align:justify;
   will-change:transform;transition:transform .32s cubic-bezier(.3,.7,.2,1)}
 #rcols.snap{transition:none}
@@ -291,12 +308,12 @@ body.arranging #arrange{display:flex}
 </a>
 <div id="tools">
   <button class="chip" id="bCat" type="button" title="Card catalog (C)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h4v12H3zM8 4h3v12H8zM12.5 4.6l3-.8 3 11.6-3 .8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="lbl">Catalog</span></button>
-  <button class="chip" id="bArr" type="button" aria-pressed="false" title="Rearrange the room (Tab)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 11h12v3H4zM5 14v3M15 14v3M6 11V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="lbl">Arrange</span></button>
+  <button class="chip" id="bArr" type="button" aria-pressed="false" title="Rearrange the room (B)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 11h12v3H4zM5 14v3M15 14v3M6 11V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="lbl">Arrange</span></button>
   <button class="chip" id="bInv" type="button" title="Invite friends to read with you"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 17c0-3 2.5-5 5-5s5 2 5 5M14 6v6M11 9h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="lbl" id="bInvL">Invite</span></button>
   <button class="chip" id="bView" type="button" aria-pressed="false" title="First or third person (V)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="10" r="2.4" fill="currentColor"/></svg><span class="lbl">View</span></button>
   <button class="chip" id="bZoom" type="button" aria-pressed="false" title="Zoom in on the shelves (wheel, pinch, + / −, Z)"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.2 12.2L17 17M6.3 8.5h4.4M8.5 6.3v4.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="lbl" id="bZoomL">Zoom</span></button>
   <button class="chip" id="bSnd" type="button" aria-expanded="false" aria-controls="sndMenu" title="Sound: the fire, footsteps and books, the film"><svg viewBox="0 0 20 20" aria-hidden="true"><path id="sndIcon" d="M3 8h3l4-3v10l-4-3H3z M13 7a4 4 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg></button>
-  <button class="chip" id="bHelp" type="button" title="Controls">?</button>
+  <button class="chip" id="bHelp" type="button" title="Controls (?)" aria-label="Controls and help">?</button>
   <div id="sndMenu" role="group" aria-labelledby="sndH" hidden><p id="sndH">Sound <small>just for you</small></p></div>
 </div>
 
@@ -312,7 +329,8 @@ body.arranging #arrange{display:flex}
   <div id="prompt"></div>
   <div id="acts"></div>
 </div>
-<div id="chat"><div id="chatlog" aria-live="polite"></div><input id="chatin" maxlength="160" placeholder="Say something… (Enter)" autocomplete="off"></div>
+<div id="chat"><div id="chatlog" aria-live="polite"></div><input id="chatin" maxlength="160" placeholder="Say something… (Enter)" aria-label="Say something to the room" autocomplete="off"></div>
+<div id="tour" role="status" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <section id="title">
@@ -338,8 +356,6 @@ body.arranging #arrange{display:flex}
     <button type="button" class="who" data-id="wells" aria-pressed="false" title="Born enslaved in Mississippi; journalist who documented lynching."><img alt="" src="portraits/wells.webp"><span class="n">Ida B. Wells</span><span class="y">1862–1931</span></button>
     <button type="button" class="who" data-id="dubois" aria-pressed="false" title="Historian and sociologist; wrote The Souls of Black Folk."><img alt="" src="portraits/dubois.webp"><span class="n">W. E. B. Du Bois</span><span class="y">1868–1963</span></button>
     <button type="button" class="who" data-id="robeson" aria-pressed="false" title="Son of a man who escaped slavery in North Carolina; valedictorian at Rutgers, a law degree from Columbia, then the spirituals in concert and Othello on the London stage."><img alt="" src="portraits/robeson.webp"><span class="n">Paul Robeson</span><span class="y">1898–1976</span></button>
-    <button type="button" class="who locked" data-id="malcolm" aria-pressed="false"><img alt="" src="portraits/malcolm.webp"><span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">0/10 books · 0/1 read</span></button>
-    <button type="button" class="who locked" data-id="king" aria-pressed="false"><img alt="" src="portraits/king.webp"><span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">0/10 books · 0/1 read</span></button>
     <button type="button" class="who locked" data-id="carmichael" aria-pressed="false"><img alt="" src="portraits/carmichael.webp"><span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">0/10 books · 0/1 read</span></button>
     <button type="button" class="who locked" data-id="ture" aria-pressed="false"><img alt="" src="portraits/ture.webp"><span class="q" aria-hidden="true">?</span><span class="n">Hidden</span><span class="y">0/10 books · 0/1 read</span></button>
   </div>
@@ -355,7 +371,7 @@ body.arranging #arrange{display:flex}
       <li><b>2</b><span>Enter, and follow the gold carpet to the lit shelves: the slave narratives.</span></li>
       <li><b>3</b><span class="kb">Click a book to take it down. Click a chair to sit and read.</span><span class="tp">Tap a book to take it down. Tap a chair to sit and read.</span></li>
     </ol>
-    <p class="ctl kb"><b>WASD</b> walk · <b>drag</b> to look · <b>Z</b> zoom · <b>C</b> catalog · <b>V</b> view · <b>Tab</b> rearrange</p>
+    <p class="ctl kb"><b>WASD</b> walk · <b>drag</b> to look · <b>Z</b> zoom · <b>C</b> catalog · <b>V</b> view · <b>B</b> rearrange</p>
     <p class="ctl tp"><b>Left thumb</b> walks · <b>drag</b> to look · <b>tap the floor</b> to walk there · <b>pinch</b> to zoom</p>
   </div>
   <div id="nogl" hidden>This device can't draw the 3D room, but every book is still here: open the catalog to read.</div>
@@ -365,7 +381,7 @@ body.arranging #arrange{display:flex}
   <div class="card" role="dialog" aria-modal="true" aria-labelledby="catH">
     <header><h2 id="catH">The Card Catalog</h2><button class="x" type="button" data-close aria-label="Close">✕</button></header>
     <div class="body">
-      <input id="q" type="search" placeholder="Search titles and authors" autocomplete="off">
+      <input id="q" type="search" placeholder="Search titles and authors" aria-label="Search titles and authors" autocomplete="off">
       <div id="catTabs" class="ctabs"></div>
       <div id="catList"></div>
       <p class="muted" id="catFoot"></p>
@@ -392,14 +408,14 @@ body.arranging #arrange{display:flex}
       <p><b style="color:var(--gold2)">Notes in the margin.</b> In the reader, select a few words (or tap a paragraph) and choose <i>Note</i>. Your notes stay with the book; in a shared room, friends see them too.</p>
       <p><b style="color:var(--gold2)">The cinema.</b> Pull the cord by the fire and a screen comes down over the mantel; the projector behind the sofa rises to show race films and early Black cinema, all in the public domain. Click the projector to choose a film, or paste a direct .mp4 or .webm link, or a YouTube link (which plays in a window). In a shared room everyone sees the same film. Click the screen to watch it up close, in a window, where the player's own buttons pause it for the room; to watch it filling your own screen, press <b>G</b> or the full-screen button; <b>M</b> or the speaker button mutes it for you alone. Esc closes the window.</p>
       <p><b style="color:var(--gold2)">Sound.</b> The speaker button at the top opens the room's sounds, each on or off for you alone: the fire, footsteps and books, and the film. Turn off the fire and the film keeps its sound.</p>
-      <p><b style="color:var(--gold2)">Rearrange.</b> Press Tab (or <i>Arrange</i>) to move furniture, turn it with Q and E, add new pieces or put them away. Bookcases you add come with empty shelves for your own sections.</p>
+      <p><b style="color:var(--gold2)">Rearrange.</b> Press B (or <i>Arrange</i>) to move furniture, turn it with Q and E, add new pieces or put them away. Bookcases you add come with empty shelves for your own sections.</p>
       <p><b style="color:var(--gold2)">Read together.</b> <i>Invite</i> makes a link. Friends who open it walk into your room as their reader, see what you're reading and can talk in the room. On the shared claude.ai page there is no link to send: everyone who opens the page walks into one shared library (up to six at a time is comfortable), and books and furniture stay where you all leave them.</p>
       <p>The texts are U.S. public domain, from the Project Gutenberg editions; see <a href="SOURCES.md" style="color:var(--gold)">SOURCES.md</a>.</p>
     </div>
   </div>
 </div>
 
-<section id="reader" class="paper" hidden aria-label="Reader">
+<section id="reader" class="paper" hidden role="dialog" aria-modal="true" aria-label="Reader">
   <div class="rtop">
     <button class="rbtn" id="rClose" type="button" aria-label="Close the book" title="Close (Esc)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <button class="rbtn" id="rToc" type="button" aria-pressed="false" title="Chapters"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
@@ -423,7 +439,7 @@ body.arranging #arrange{display:flex}
       </div>
     </div>
   </div>
-  <div class="rbot"><span id="rPg"></span><input type="range" id="rSeek" min="0" max="100" value="0" aria-label="Position in chapter"><span id="rPct"></span></div>
+  <div class="rbot"><span id="rPg" aria-live="polite"></span><input type="range" id="rSeek" min="0" max="100" value="0" aria-label="Position in chapter"><span id="rPct"></span></div>
 </section>
 <div id="rsel"><button type="button" id="rsNote">✎ Note</button><button type="button" id="rsCopy">Copy</button></div>
 <div id="noted" hidden>

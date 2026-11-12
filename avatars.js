@@ -16,16 +16,27 @@
      Booker T. Washington: close crop parted on the left, clean-shaven, dark three-piece suit, high stiff collar.
      W. E. B. Du Bois: goatee and upturned moustache, receding hair, three-piece suit worn open, watch chain.
      Paul Robeson: tall and broad, close-cropped hair, clean-shaven, a dark three-piece suit.
-     Malcolm X: browline glasses, close crop, moustache, white shirt and narrow tie with a clip.
-     Martin Luther King Jr.: close crop, a thin moustache, a round face, dark suit, white shirt, dark tie.
      Stokely Carmichael, as in the photographs of 1966 to 1968: tall and lean, a short natural, clean-shaven,
        the black turtleneck and dark glasses.
      Kwame Ture in his last years in Guinea, the same man: grey natural hair high at the temples, a short grey
        beard, a long white West African robe embroidered in blue at the neck and down the front.
+     Hubert H. Harrison in the early 1920s (When Africa Awakes, his Negro World reviews): very dark, clean-shaven,
+       hair cropped close and high at the temples, round wire spectacles, a dark three-piece suit.
+     Marcus Garvey at his desk in 1924 (Library of Congress, Bain collection): broad and solid, a full moustache, a
+       dark suit with a lighter waistcoat, the association's badge on his lapel. The suit, not the parade uniform:
+       his opponents made the uniform a joke at his expense, and the room does not repeat it.
+     Kwame Nkrumah as the "avid reader" of his 1942 Lincoln University yearbook: slim, round spectacles, a dark
+       suit, a white pocket square.
+     Walter Rodney at Dar es Salaam, about 1972: slight, a full Afro and short beard, heavy dark spectacles, a loose
+       light shirt worn open at the neck. No free photograph of him exists; he is drawn from descriptions and
+       looked-at photographs, none copied.
    Heights follow the people where known, so they stand true to one another: Douglass about six feet, Harriet
-   Jacobs five foot four (Norcom's runaway notice, 1835), Du Bois five foot six, King about five foot seven,
-   Malcolm X and Paul Robeson six foot three. Harriet Bailey is "tall" in her son's words. Carmichael, about six
-   foot two, is estimated from Bob Fitch's 1966 photograph of him walking beside King. Wells, Washington
+   Jacobs five foot four (Norcom's runaway notice, 1835), Du Bois five foot six,
+   Paul Robeson six foot three, Hubert Harrison and Marcus Garvey five foot seven (Harrison's
+   naturalisation certificate, 1922; Garvey's declaration of intention, 1921). Nkrumah, about five foot nine, is
+   measured against Kennedy in two 1961 photographs; Rodney, "of average height" in the 2016 Guyana inquiry, about
+   five foot seven and a half. Harriet Bailey is "tall" in her son's words. Carmichael, about six
+   foot two, is estimated from Bob Fitch's 1966 photograph of him walking beside Martin Luther King Jr. (about five foot seven). Wells, Washington
    and Wheatley have no recorded height; they stand at about the average of their time. Skin tones are each person's own, warm under the lamps.
 
    build(id) -> av: { root, hand, head, setState({ speed, sit, read, listen }), update(dt), info, height }
@@ -57,13 +68,15 @@ const RR_AVATARS = (() => {
     { id: 'washington', name: 'Booker T. Washington', years: '1856–1915', line: 'Born enslaved in Virginia; learned to read while working in salt furnaces and a coal mine, walked much of the way to Hampton, and founded Tuskegee.' },
     { id: 'wells', name: 'Ida B. Wells', years: '1862–1931', line: 'Born enslaved in Mississippi; journalist who documented lynching.' },
     { id: 'dubois', name: 'W. E. B. Du Bois', years: '1868–1963', line: 'Historian and sociologist; wrote The Souls of Black Folk.' },
+    { id: 'harrison', name: 'Hubert H. Harrison', years: '1883–1927', line: 'Born in St. Croix; came to New York in 1900, read and lectured on Harlem street corners, ran the Negro World\'s book reviews, and wrote When Africa Awakes (1920).' },
+    { id: 'garvey', name: 'Marcus Garvey', years: '1887–1940', line: 'A Jamaican printer who read Up from Slavery and in 1914 founded the Universal Negro Improvement Association; his editorials were gathered as Philosophy and Opinions.' },
     { id: 'robeson', name: 'Paul Robeson', years: '1898–1976', line: 'Son of a man who escaped slavery in North Carolina; valedictorian at Rutgers, a law degree from Columbia, then the spirituals in concert and Othello on the London stage.' },
-    { id: 'malcolm', name: 'Malcolm X', years: '1925–1965', line: 'Rebuilt himself through reading in a prison library.' },
-    { id: 'king', name: 'Martin Luther King Jr.', years: '1929–1968', line: 'Entered Morehouse College at fifteen, where he first read Thoreau on civil disobedience: his first contact with the theory of nonviolent resistance.' },
+    { id: 'nkrumah', name: 'Kwame Nkrumah', years: '1909–1972', line: 'A student in America for ten years, the "avid reader" of his Lincoln University yearbook; he said Garvey\'s Philosophy and Opinions inspired him most, and led Ghana to independence in 1957.' },
     { id: 'carmichael', name: 'Stokely Carmichael', years: '1941–1998', line: 'Born in Port of Spain, Trinidad; from his first day at the Bronx High School of Science he kept a list of writers to read; a Freedom Rider at nineteen, he took a philosophy degree at Howard and organised Black voters in Lowndes County, Alabama.' },
-    { id: 'ture', name: 'Kwame Ture', years: '1941–1998', line: 'Stokely Carmichael took the name Kwame Ture to honour Kwame Nkrumah and Sékou Touré; he made his home in Conakry, Guinea, and organised for the All-African People\'s Revolutionary Party until his death in 1998.' }
+    { id: 'ture', name: 'Kwame Ture', years: '1941–1998', line: 'Stokely Carmichael took the name Kwame Ture to honour Kwame Nkrumah and Sékou Touré; he made his home in Conakry, Guinea, and organised for the All-African People\'s Revolutionary Party until his death in 1998.' },
+    { id: 'rodney', name: 'Walter Rodney', years: '1942–1980', line: 'Born in Georgetown, British Guiana; a historian of Africa who taught at Dar es Salaam and there wrote How Europe Underdeveloped Africa (1972).' },
   ];
-  const ALIAS = { tubman: 'wheatley', truth: 'bailey' };      // readers who used to be here -> who stands in their place
+  const ALIAS = { tubman: 'wheatley', truth: 'bailey', malcolm: 'douglass', king: 'douglass' };      // readers who used to be here -> who stands in their place
 
   /* ---------------- a small kit: maths, surfaces, merging ---------------- */
   const D = Math.PI / 180, TAU = Math.PI * 2;
@@ -205,6 +218,7 @@ const RR_AVATARS = (() => {
   function tube(pts, r, seg) { return new T.TubeGeometry(new T.CatmullRomCurve3(pts), seg || Math.max(8, pts.length * 4), r, 6, false); }
 
   const matCache = new Map();
+  const darker = (hex, k) => new T.Color(hex).multiplyScalar(k).getHex();   // the same colour, darker by a factor
   function mat(hex, rough, metal, extra) {
     const k = hex + ':' + rough + ':' + (metal || 0) + ':' + (extra ? Object.keys(extra).map(n => n + '=' + (extra[n] && extra[n].isTexture ? extra[n].uuid : extra[n])).join(',') : '');
     if (!matCache.has(k)) {
@@ -360,21 +374,29 @@ const RR_AVATARS = (() => {
       face: { w: 1.13, long: 1.08, jaw: 0.5, deep: 1.05, brow: 1.2, cheek: 1.2, full: 1.05, age: 0.35, nw: 1.32, nl: 1.04, lips: 1.4, mw: 1.12, chin: 1.2 },
       hairStyle: 'receding', top: 'suit', coat: 0x55524f, vest: 0x4a4744, trousers: 0x55524f, shirt: 0xf2eee5, tie: 0x5a2a22, tieStyle: 'four',
       shoes: 0x0b0908, collarH: 0.05, lapW: 0.06, yBtn: 1.16 },
-    malcolm: { h: 1.91, sex: 'm', b: 0.97, skin: 0x9a6a4d, hair: 0x5a3020, brow: 0x46281a, browK: 1.15,
-      face: { w: 0.96, long: 1.07, jaw: 0.2, deep: 1.05, brow: 1.15, cheek: 0.9, full: 0.5, age: 0.25, nw: 0.95, nl: 1.06, lips: 0.95, mw: 1, chin: 1.2 },
-      hairStyle: 'crop', beard: 'mustache', specs: 'browline', freckles: true, top: 'suit', coat: 0x3a3733, trousers: 0x3a3733, shirt: 0xf5f2ea, tie: 0x141416, tieStyle: 'narrow',
-      clip: 0xd6c08a, shoes: 0x0b0908, collarH: 0.04, lapW: 0.044, yBtn: 1.1 },
-    king: { h: 1.7, sex: 'm', b: 1.0, skin: 0x7a5038, hair: 0x15100d, brow: 0x16100c, browK: 1.05,
-      face: { w: 1.1, long: 0.95, jaw: 0.12, deep: 0.95, brow: 0.95, cheek: 1.4, full: 1.55, age: 0.2, nw: 1.15, nl: 0.96, lips: 1.2, mw: 1.04, chin: 0.92 },
-      hairStyle: 'crop', beard: 'mustache', top: 'suit', coat: 0x24252b, trousers: 0x24252b, shirt: 0xf4f1ea, tie: 0x1a1c24, tieStyle: 'four',
-      shoes: 0x0b0908, collarH: 0.045, lapW: 0.05, yBtn: 1.14 },
     carmichael: { h: 1.88, sex: 'm', b: 0.92, skin: 0x5c3b29, hair: 0x120d0b, brow: 0x130e0b, browK: 1.05,
       face: { w: 0.94, long: 1.1, jaw: 0.22, deep: 1.0, brow: 1.05, cheek: 1.2, full: 0.65, age: 0, nw: 1.2, nl: 1.02, lips: 1.25, mw: 1.05, chin: 1.05 },
       hairStyle: 'natural', hairVol: 0.008, specs: 'shades', top: 'turtleneck', coat: 0x0f0f11, trousers: 0x161619, shoes: 0x0b0908, collarH: 0.04, lapW: 0.04, yBtn: 1.12 },
+    harrison: { h: 1.70, sex: 'm', b: 1.05, skin: 0x3c291f, hair: 0x15100d, brow: 0x140f0c, browK: 1.05,
+      face: { w: 1.08, long: 1.0, jaw: 0.15, deep: 1.05, brow: 1.1, cheek: 1.05, full: 1.3, age: 0.3, nw: 1.28, nl: 1.0, lips: 1.3, mw: 1.05, chin: 0.95 },
+      hairStyle: 'natural', hairVol: 0.004, recede: 0.8, specs: 'round', top: 'suit', coat: 0x26262b, vest: 0x2b2b30, trousers: 0x26262b, shirt: 0xf2eee5, tie: 0x4a3a32, tieStyle: 'four',
+      shoes: 0x0b0908, collarH: 0.05, lapW: 0.052, yBtn: 1.14 },
+    garvey: { h: 1.70, sex: 'm', b: 1.1, skin: 0x3e2a1f, hair: 0x15100d, brow: 0x140f0c, browK: 1.08,
+      face: { w: 1.12, long: 0.98, jaw: 0.1, deep: 1.0, brow: 1.1, cheek: 1.1, full: 1.45, age: 0.3, nw: 1.28, nl: 0.98, lips: 1.25, mw: 1.06, chin: 0.98 },
+      hairStyle: 'natural', hairVol: 0.004, recede: 0.6, beard: 'mustache', beardK: 1.5, top: 'suit', coat: 0x1f1f24, vest: 0x77736e, trousers: 0x1f1f24, shirt: 0xf2eee5, tie: 0x3c2a30, tieStyle: 'four',
+      badge: 0xcfc6b0, shoes: 0x0b0908, collarH: 0.05, lapW: 0.056, yBtn: 1.16 },
+    nkrumah: { h: 1.75, sex: 'm', b: 0.94, skin: 0x4a3123, hair: 0x15100d, brow: 0x140f0c, browK: 1.05,
+      face: { w: 0.98, long: 1.08, jaw: 0.25, deep: 1.15, brow: 1.1, cheek: 1.3, full: 0.7, age: 0.25, nw: 1.22, nl: 1.05, lips: 1.3, mw: 1.05, chin: 1.1 },
+      hairStyle: 'natural', hairVol: 0.005, recede: 0.6, specs: 'round', top: 'suit', coat: 0x2a2a30, trousers: 0x2a2a30, shirt: 0xf2eee5, tie: 0x5a4c44, tieStyle: 'four',
+      pocketSq: 0xf4f1ea, shoes: 0x0b0908, collarH: 0.045, lapW: 0.05, yBtn: 1.14 },
     ture: { h: 1.88, sex: 'm', b: 0.92, skin: 0x5e3d2b, hair: 0xbcb5aa, brow: 0x8c847a, browK: 0.9, freckles: true,
       face: { w: 0.94, long: 1.1, jaw: 0.22, deep: 1.05, brow: 1.05, cheek: 1.25, full: 0.5, age: 0.85, nw: 1.2, nl: 1.04, lips: 1.15, mw: 1.05, chin: 1.05 },
       hairStyle: 'natural', hairVol: 0.012, recede: 1, beard: 'full', beardK: 0.32, top: 'robe', coat: 0xf0ece3, embroidery: 0x2d5597, sleeve: 'wide',
-      trousers: 0xe6e1d6, shoes: 0x3a2a1e, collarH: 0.04, lapW: 0.04, yBtn: 1.12 }
+      trousers: 0xe6e1d6, shoes: 0x3a2a1e, collarH: 0.04, lapW: 0.04, yBtn: 1.12 },
+    rodney: { h: 1.71, sex: 'm', b: 0.9, skin: 0x4c3224, hair: 0x120d0b, brow: 0x120d0b, browK: 1.05,
+      face: { w: 0.95, long: 1.05, jaw: 0.25, deep: 1.05, brow: 1.05, cheek: 1.1, full: 0.6, age: 0.15, nw: 1.15, nl: 1.0, lips: 1.15, mw: 1.0, chin: 1.0 },
+      hairStyle: 'natural', hairVol: 0.014, recede: 0, beard: 'full', beardK: 0.45, specs: 'thick', top: 'shirt', coat: 0xece6d8, trousers: 0x2e2c2f,
+      shoes: 0x0b0908, collarH: 0.04, lapW: 0.04, yBtn: 1.12 }
   };
 
   /* ---------------- the head: one sculpted surface, read in degrees (az from the front, el up) ---------------- */
@@ -584,7 +606,11 @@ const RR_AVATARS = (() => {
     const fem = L.sex === 'f', H = headKit(F), b = L.b, WV = { weave: L.weave || 0.3 }, WV2 = { weave: L.weave || 0.3, side: T.DoubleSide };
     const parts = new Map();
     const add = (bone, m, g, mx, tag) => { const key = bone + '|' + m.uuid + (tag ? '|' + tag : ''); let p = parts.get(key); if (!p) parts.set(key, p = { bone, mat: m, items: [], tag }); p.items.push(one(g, mx)); };
-    const sr = L.skinRough || 0.58, skinM = mat(L.skin, sr), faceM = new T.MeshStandardMaterial({ map: faceTex(L, F), roughness: sr - 0.03 });
+    // Skin shows its form in its highlights, and the deeper the skin, the more of the face's shape they carry: under
+    // the room's low warm lamps a deep brown face drawn as rough as a light one loses its cheekbones, brow and jaw.
+    // So darker skin is a little less rough (0.58 for the lightest here, 0.47 for the deepest); its colour is its own.
+    const sv = (((L.skin >> 16) & 255) + ((L.skin >> 8) & 255) + (L.skin & 255)) / 765;
+    const sr = L.skinRough || lerp(0.47, 0.58, smooth(0.16, 0.42, sv)), skinM = mat(L.skin, sr), faceM = new T.MeshStandardMaterial({ map: faceTex(L, F), roughness: sr - 0.03 });
     const shirtM = mat(L.shirt || 0xf0ebe0, 0.78), shirt2 = mat(L.shirt || 0xf0ebe0, 0.78, 0, { side: T.DoubleSide });
     const R = { headK: Math.pow(1.75 / L.h, 0.35), SH: (fem ? 0.14 : 0.157) * b, fem, drapes: [], L };
 
@@ -706,10 +732,11 @@ const RR_AVATARS = (() => {
         return cover(m, h);
       }, { az0: -40, az1: 40, na: 36, el0: -90, el1: -18, ne: 36, ru: 6, rv: 4, front: 0.5 }));
     } else if (L.beard === 'mustache') {
+      const mk = L.beardK || 1, wa = 2.6 * (mk - 1), lo = 1.4 * (mk - 1);   // beardK > 1: a fuller moustache, a little wider and lower
       add('skull', beardM, H.shell((az, el) => {
         const A = Math.abs(az);
-        return cover(smooth(17.5, 14.5, A) * smooth(-31.6, -30.2, el) * smooth(-26.8, -28.2, el + A * 0.06) * (1 - 0.6 * bump(az, el, 0, -27.6, 2, 1.5)), 0.0026 - 0.0012 * smooth(4, 16, A));
-      }, { az0: -32, az1: 32, na: 30, el0: -40, el1: -20, ne: 16, ru: 5, rv: 2, front: 0.5 }));
+        return cover(smooth(17.5 + wa, 14.5 + wa, A) * smooth(-31.6 - lo, -30.2 - lo, el) * smooth(-26.8, -28.2, el + A * 0.06) * (1 - 0.6 / mk * bump(az, el, 0, -27.6, 2, 1.5)), (0.0026 - 0.0012 * smooth(4, 16, A)) * mk);
+      }, { az0: -34, az1: 34, na: 30, el0: -42, el1: -20, ne: 16, ru: 5, rv: 2, front: 0.5 }));
     }
     if (st === 'wrap') {
       // a headwrap of checked cotton wound over all the hair: a rolled edge across the brow, folds running
@@ -748,21 +775,39 @@ const RR_AVATARS = (() => {
         return at(az, el, capH(az, el, dirOf(az, el, dir)) + 0.0022, out);
       }, { ref: (pp) => pp }));
     }
-    if (L.specs === 'browline' || L.specs === 'shades') {
+    if (L.specs === 'round') {
+      // thin round wire rims of the 1920s: the same fine wire all the way round, round lenses, wire arms
+      const wire = mat(L.specsWire || 0x6e5c3e, 0.35, 0.85), glass = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.1, depthWrite: false });
+      const z0 = Math.max(C.z + ER + 0.011, H.surf(eyeAz, 13, new T.Vector3()).z + 0.0075), rims = [], lens = [], r = 0.0178;
+      [-1, 1].forEach(s => {
+        const cx = s * (C.x + 0.003), cy = C.y + 0.0005;
+        const pt = (a) => new T.Vector3(cx + Math.cos(a) * r, cy + Math.sin(a) * r, z0 - 0.004 * Math.pow(Math.max(0, Math.cos(a) * s), 2));
+        const ring = []; for (let i = 0; i <= 32; i++) ring.push(pt(i / 32 * TAU));
+        rims.push(one(tube(ring, 0.0007, 40)));
+        const sh = new T.Shape(); for (let i = 0; i <= 24; i++) { const a = i / 24 * TAU; sh.lineTo(Math.cos(a) * r * 0.98, Math.sin(a) * r * 0.98); }
+        lens.push(one(new T.ShapeGeometry(sh), M4(cx, cy, z0 - 0.002)));
+        const hinge = pt(s > 0 ? 0.08 : Math.PI - 0.08);
+        rims.push(one(tube([hinge, new T.Vector3(s * (H.W * 0.95), cy + 0.004, z0 - 0.03), new T.Vector3(s * (H.W + 0.004), cy + 0.002, -0.02), new T.Vector3(s * (H.W + 0.002), cy - 0.02, -0.045)], 0.0008, 20)));
+      });
+      rims.push(one(tube([new T.Vector3(-(C.x + 0.003 - r), C.y + 0.003, z0), new T.Vector3(0, C.y + 0.0075, z0 + 0.002), new T.Vector3(C.x + 0.003 - r, C.y + 0.003, z0)], 0.0008, 10)));   // the bridge
+      add('skull', wire, merge(rims)); add('skull', glass, merge(lens));
+    }
+    if (L.specs === 'browline' || L.specs === 'shades' || L.specs === 'thick') {
       // browline spectacles: heavy dark tops over the brows, fine gold rims below, gold bridge and arms;
-      // shades: the same frame all in black, with dark lenses
-      const dark = L.specs === 'shades';
-      const top = mat(0x15100c, 0.35), wire = dark ? mat(0x0c0b0b, 0.3) : mat(0xc9b07a, 0.3, 0.9), glass = dark ? new T.MeshStandardMaterial({ color: 0x07080a, roughness: 0.08, metalness: 0.35 }) : new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.1, depthWrite: false });
+      // shades: the same frame all in black, with dark lenses; thick: a heavy dark frame all round, clear lenses
+      const dark = L.specs === 'shades', thick = L.specs === 'thick';
+      const top = mat(0x15100c, 0.35), wire = dark || thick ? mat(0x0c0b0b, 0.3) : mat(0xc9b07a, 0.3, 0.9), glass = dark ? new T.MeshStandardMaterial({ color: 0x07080a, roughness: 0.08, metalness: 0.35 }) : new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.1, depthWrite: false });
       const z0 = Math.max(C.z + ER + 0.011, H.surf(eyeAz, 13, new T.Vector3()).z + 0.0075), tops = [], rims = [], lens = [];
       [-1, 1].forEach(s => {
-        const cx = s * (C.x + 0.003), cy = C.y + (dark ? -0.001 : 0.001), w = dark ? 0.027 : 0.025, hh = dark ? 0.02 : 0.017;
-        const pt = (a) => new T.Vector3(cx + Math.cos(a) * w * s, cy + Math.sin(a) * hh * (Math.sin(a) > 0 ? 1.05 : 1), z0 - 0.006 * Math.pow(Math.max(0, Math.cos(a) * s * s), 2) - (s * Math.cos(a) * s > 0 ? 0.003 : 0));
+        const cx = s * (C.x + 0.003), cy = C.y + (dark ? -0.001 : 0.001), w = dark || thick ? 0.027 : 0.025, hh = dark ? 0.02 : thick ? 0.0185 : 0.017;
+        const sq = (v) => thick ? Math.sign(v) * Math.pow(Math.abs(v), 0.55) : v;   // thick frames are squarer
+        const pt = (a) => new T.Vector3(cx + sq(Math.cos(a)) * w * s, cy + sq(Math.sin(a)) * hh * (Math.sin(a) > 0 ? 1.05 : 1), z0 - 0.006 * Math.pow(Math.max(0, Math.cos(a) * s * s), 2) - (s * Math.cos(a) * s > 0 ? 0.003 : 0));
         const upper = [], lower = [];
         for (let i = 0; i <= 14; i++) upper.push(pt(-0.2 + i / 14 * (Math.PI + 0.4)));
         for (let i = 0; i <= 14; i++) lower.push(pt(Math.PI + 0.2 + i / 14 * (Math.PI - 0.4)));
         tops.push(one(tube(upper, 0.0027, 30)));
-        rims.push(one(tube(lower, dark ? 0.0016 : 0.0007, 30)));
-        const sh = new T.Shape(); for (let i = 0; i <= 24; i++) { const a = i / 24 * TAU; sh.lineTo(Math.cos(a) * w * 0.98, Math.sin(a) * hh * 0.98); }
+        rims.push(one(tube(lower, thick ? 0.0024 : dark ? 0.0016 : 0.0007, 30)));
+        const sh = new T.Shape(); for (let i = 0; i <= 24; i++) { const a = i / 24 * TAU; sh.lineTo((thick ? Math.sign(Math.cos(a)) * Math.pow(Math.abs(Math.cos(a)), 0.55) : Math.cos(a)) * w * 0.98, (thick ? Math.sign(Math.sin(a)) * Math.pow(Math.abs(Math.sin(a)), 0.55) : Math.sin(a)) * hh * 0.98); }
         lens.push(one(new T.ShapeGeometry(sh), M4(cx, cy, z0 - 0.002)));
         const hinge = pt(s > 0 ? 0.05 : Math.PI - 0.05);
         rims.push(one(tube([hinge, new T.Vector3(s * (H.W * 0.95), cy + 0.004, z0 - 0.03), new T.Vector3(s * (H.W + 0.004), cy + 0.002, -0.02), new T.Vector3(s * (H.W + 0.002), cy - 0.02, -0.045)], 0.0011, 20)));
@@ -779,6 +824,9 @@ const RR_AVATARS = (() => {
       // a knitted roll collar up the neck, folded over at the top
       const km = mat(L.coat, 0.92, 0, WV);
       add('neck', km, loft([[-0.01, 0.0655, 0.068, 0.064, 0.002], [0.03, 0.0615, 0.0635, 0.06, 0.004], [0.075, 0.059, 0.061, 0.0575, 0.006], [0.1, 0.0615, 0.0635, 0.06, 0.007], [0.112, 0.0575, 0.0595, 0.056, 0.007], [0.104, 0.051, 0.053, 0.05, 0.007]], 28));
+    } else if (!fem && L.top === 'shirt') {
+      // a loose collarless shirt: a plain round neckline, a short slit at the throat (below)
+      add('neck', mat(L.coat, 0.88, 0, WV), loft([[-0.02, 0.075, 0.077, 0.072, 0.002, 2], [-0.006, 0.068, 0.07, 0.065, 0.003, 2], [0.004, 0.063, 0.065, 0.061, 0.003, 2]], 30));
     } else if (!fem && L.top === 'robe') {
       // a round neckline, embroidered (the embroidery runs on down the front, below)
       add('neck', mat(L.embroidery, 0.6), loft([[-0.03, 0.079, 0.081, 0.076, 0.002, 2], [-0.012, 0.072, 0.074, 0.069, 0.003, 2], [0.002, 0.066, 0.068, 0.063, 0.003, 2], [0.008, 0.062, 0.064, 0.06, 0.003, 2]], 30));
@@ -817,6 +865,9 @@ const RR_AVATARS = (() => {
       const em = mat(L.embroidery, 0.6);
       add('chest', em, decal(TR, (u, v) => [lerp(-1, 1, u) * lerp(0.02, 0.011, v), lerp(yl(1.43), yl(1.16), v)], 4, 14, 0.0016, 0.0016));
       [-1, 1].forEach(s => add('chest', em, decal(TR, (u, v) => [s * (lerp(0.029, 0.019, v) + u * 0.004), lerp(yl(1.42), yl(1.2), v)], 2, 12, 0.0012, 0.0014)));
+    } else if (!fem && L.top === 'shirt') {
+      // the slit at the throat, its edges a shade darker; the shirt hangs loose outside the trousers (drape, below)
+      add('chest', mat(darker(L.coat, 0.55), 0.9), decal(TR, (u, v) => [lerp(-0.0028, 0.0028, u), lerp(yl(1.452), yl(1.37), v)], 1, 6, 0.0011, 0.0012));
     } else if (!fem && L.top === 'turtleneck') {
       // a plain knit: ribbing at the waist
       add('chest', mat(L.coat, 0.92, 0, WV), decal(TR, (u, v) => [lerp(-0.13, 0.13, u), lerp(yl(1.0), yl(0.975), v)], 16, 1, 0.0012, 0.002));
@@ -857,6 +908,12 @@ const RR_AVATARS = (() => {
         const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10, x = lerp(0, 0.085, t), y = yl(1.115) - Math.sin(t * Math.PI) * 0.028 + t * 0.012; pts.push(new T.Vector3(x, y, surfZ(TR, x, y) + 0.0075)); }
         add('chest', mat(L.chain, 0.3, 0.95), tube(pts, 0.0017, 40));
         add('chest', mat(L.chain, 0.3, 0.95), tube(pts.map(p => new T.Vector3(-p.x * 0.6, p.y + (p.y - yl(1.115)) * 0.2, surfZ(TR, -p.x * 0.6, p.y) + 0.0075)), 0.0015, 30));
+      }
+      if (L.badge) { const x = 0.052, y = yl(1.392); add('chest', mat(L.badge, 0.35, 0.5), new T.CylinderGeometry(0.0085, 0.0085, 0.0022, 16), M4(x, y, surfZ(TR, x, y) + 0.0068, 1, 1, 1, Math.PI / 2 - 0.12)); }
+      if (L.pocketSq) {   // a folded square: two points standing above the breast pocket
+        const pm = mat(L.pocketSq, 0.7), y = yl(1.318);
+        [[0.09, 0.42], [0.108, -0.32]].forEach(([x, rz]) => add('chest', pm, new T.BoxGeometry(1, 1, 1), M4(x, y + 0.006, surfZ(TR, x, y) + 0.0042, 0.016, 0.016, 0.0022, -0.12, 0, Math.PI / 4 + rz)));
+        add('chest', topM, decal(TR, (u, v) => [lerp(0.075, 0.125, u), lerp(yl(1.312), yl(1.296), v) + u * 0.006], 4, 1, 0.003, 0.004));   // the pocket's edge in front of it
       }
       // pockets: a flap low on each side, a welt on the left breast
       [-1, 1].forEach(s => add('chest', topM, decal(TR, (u, v) => [s * lerp(0.07, 0.135, u), lerp(yl(1.035), yl(1.015), v) + (u - 0.5) * 0.004], 4, 1, 0.0015, 0.003)));
@@ -900,6 +957,9 @@ const RR_AVATARS = (() => {
     } else if (L.top === 'robe') {
       R.drapes.push({ mat: mat(L.coat, 0.85, 0, WV2), top: 0.13, len: 0.86, gap: [0, 0], na: 36, nt: 14,
         rx: [[0, 0.158], [0.1, 0.18], [0.4, 0.215], [1, 0.25]], f: 0.86, b: 1.0, z0: -0.015, fall: 1 });
+    } else if (L.top === 'shirt') {
+      R.drapes.push({ mat: mat(L.coat, 0.88, 0, WV2), top: 0.13, len: 0.13, gap: [0, 0], na: 28, nt: 4,
+        rx: [[0, 0.155], [1, 0.168]], f: 0.82, b: 0.92, z0: -0.008, fall: 0.35 });
     } else if (L.top === 'turtleneck') {
       R.drapes.push({ mat: mat(L.coat, 0.92, 0, WV2), top: 0.13, len: 0.07, gap: [0, 0], na: 28, nt: 3,
         rx: [[0, 0.152], [1, 0.158]], f: 0.8, b: 0.9, z0: -0.008, fall: 0.2 });
@@ -912,7 +972,7 @@ const RR_AVATARS = (() => {
     }
 
     /* --- arms --- */
-    const sleeveM = fem ? mat(L.dress, 0.75, 0, WV) : topM, cuffM = fem ? mat(L.cuffs || L.fichu || L.dress, 0.8) : L.top === 'turtleneck' ? topM : shirtM;
+    const sleeveM = fem ? mat(L.dress, 0.75, 0, WV) : topM, cuffM = fem ? mat(L.cuffs || L.fichu || L.dress, 0.8) : L.top === 'turtleneck' || L.top === 'shirt' ? topM : shirtM;
     let upper, fore, cuff = null, ruffle = null;
     if (L.sleeve === 'mutton') {
       upper = limb([[0.05, 0.001], [0.044, 0.046], [0.026, 0.07], [-0.005, 0.08], [-0.06, 0.075], [-0.13, 0.058], [-0.2, 0.046], [-0.29, 0.041], [-0.315, 0.03], [-0.325, 0.001]], 0.94);

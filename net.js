@@ -34,6 +34,48 @@ const RR_NET = (() => {
   if (QS.get('peer')) { try { window.sessionStorage.setItem('rr-peer', QS.get('peer')); } catch (e) {} }
 
   function init(a) { app = a; }
+
+  /* ---------------- the pen's clock ----------------
+     A shared film runs on one timeline, stamped by the reader who holds the pen (the host of a friend's room, or
+     the reader the shared library elected). Each reader measures the pen's clock against its own with a few round
+     trips, keeping the quickest (half its round trip is the most it can be off by): five at first, 400 ms apart,
+     then one every 20 s, and afresh whenever the pen changes hands. So the films agree to within a frame or two,
+     even on a device whose own clock is wrong. Until the first answer the two clocks are taken to agree. */
+  const clk = { off: 0, known: false, samples: [], timer: 0, n: 0, against: null };
+  const penIsMe = () => !st.active || st.isHost;
+  function penNow() { return Date.now() + (penIsMe() ? 0 : clk.off); }
+  function clockStop() { clearTimeout(clk.timer); clk.timer = 0; clk.against = null; clk.samples = []; if (clk.off || clk.known) { clk.off = 0; clk.known = false; if (app && app.clockChanged) app.clockChanged(); } }
+  function clockStart(against) {
+    if (clk.against === against) return;
+    clockStop();
+    clk.against = against; clk.n = 0;
+    if (!against) return;
+    const tick = () => { if (!st.active || clk.against !== against) return; ask(); clk.n++; clk.timer = setTimeout(tick, clk.n < 5 ? 400 : 20000); };
+    clk.timer = setTimeout(tick, 150);
+  }
+  function ask() {
+    const t0 = Date.now();
+    if (st.commons) { if (C.room && C.hostPeer) C.room.emit('tq', { to: C.hostPeer, t0 }).catch(() => {}); }
+    else if (hostConn) { try { hostConn.send({ t: 'tq', t0 }); } catch (e) {} }
+  }
+  const answer = (q) => ({ t0: +q.t0 || 0, th: Date.now() });
+  // Each answer bounds the offset (the pen's clock minus ours): the pen read its clock after we asked (t0) and
+  // before we heard (t1), so off lies between th - t1 and th - t0. The answers together narrow it. If the clocks
+  // may agree (no offset is allowed), they are taken to agree: a guess from a jittery round trip would only add
+  // error. Otherwise the middle of what the answers allow.
+  function heard(a) {
+    const t1 = Date.now(), t0 = +a.t0, th = +a.th;
+    if (!isFinite(t0) || !isFinite(th) || t1 - t0 < 0 || t1 - t0 > 15000) return;
+    clk.samples.push({ lo: th - t1, hi: th - t0, rtt: t1 - t0 }); if (clk.samples.length > 8) clk.samples.shift();
+    let lo = -Infinity, hi = Infinity;
+    for (const x of clk.samples) { lo = Math.max(lo, x.lo); hi = Math.min(hi, x.hi); }
+    if (lo > hi) {                       // they disagree (a clock was set meanwhile): start again from this answer
+      clk.samples = clk.samples.slice(-1); lo = th - t1; hi = th - t0;
+    }
+    const was = clk.off; clk.off = lo <= 0 && hi >= 0 ? 0 : (lo + hi) / 2; clk.known = true;
+    if (Math.abs(was - clk.off) > 4 && app.clockChanged) app.clockChanged();
+  }
+  function clock() { return { off: Math.round(clk.off), known: clk.known, samples: clk.samples.length, best: clk.samples.length ? Math.min(...clk.samples.map(x => x.rtt)) : null, span: clk.samples.length ? Math.round(Math.min(...clk.samples.map(x => x.hi)) - Math.max(...clk.samples.map(x => x.lo))) : null, pen: penIsMe() }; }
   function state() { return Object.assign({}, st); }
   function loadLib() {
     if (window.Peer) return Promise.resolve();
@@ -107,6 +149,7 @@ const RR_NET = (() => {
       return;
     }
     if (!g.pid) return;
+    if (msg.t === 'tq') { try { conn.send(Object.assign({ t: 'ta' }, answer(msg))); } catch (e) {} return; }
     if (msg.t === 'op' && msg.op && typeof msg.op === 'object') {
       const op = Object.assign({}, msg.op, { who: g.pid });
       const res = app.hostOp(op);
@@ -163,10 +206,12 @@ const RR_NET = (() => {
       st.connecting = false; st.active = true;
       app.started(false, st.code);
       app.enterRoom(msg.room, msg.host && msg.host.pid);
+      clockStart('host');
       if (msg.host) app.peer(msg.host.pid, sanitizePresence(msg.host));
       (msg.peers || []).forEach(d => app.peer(d.pid, sanitizePresence(d)));
       app.status();
     } else if (msg.t === 'op' && msg.op) app.remoteOp(msg.op);
+    else if (msg.t === 'ta') heard(msg);
     else if (msg.t === 'no') app.rejected(clip(msg.reason, 120));
     else if (msg.t === 'me' && msg.d) app.peer(clip(msg.d.pid, 30), sanitizePresence(msg.d));
     else if (msg.t === 'joined') app.peerJoined(clip(msg.pid, 30), clip(msg.name, 14));
@@ -214,18 +259,21 @@ const RR_NET = (() => {
     const R = C.room, me = app.me();
     C.unsub.push(R.on('op', (m) => {
       if (m.sameTab || !m.data || !m.data.op || typeof m.data.op !== 'object') return;
+      if (m.peer !== C.hostPeer) return;                                     // only the pen's changes count (a missed one comes back with its next save)
       C.rev = Math.max(C.rev, +m.data.rev || 0);
       app.remoteOp(m.data.op);
     }, () => {}));
     C.unsub.push(R.on('req', (m) => {
       if (!st.isHost || m.sameTab || !m.data || !m.data.op || typeof m.data.op !== 'object') return;
-      const p = C.byPeer.get(m.peer); if (!p) return;
+      const p = C.byPeer.get(m.peer) || (C.twins && C.twins.get(m.peer)); if (!p) return;
       const op = Object.assign({}, m.data.op, { who: p.pid });              // a reader can only act as themselves
       const res = app.hostOp(op);
       if (res === true) hostSend(op);
       else R.emit('no', { to: m.peer, reason: clip(res, 120) }).catch(() => {});
     }, () => {}));
-    C.unsub.push(R.on('no', (m) => { if (m.data && m.data.to && m.data.to === C.mePeer) app.rejected(clip(m.data.reason, 120)); }, () => {}));
+    C.unsub.push(R.on('tq', (m) => { if (st.isHost && !m.sameTab && m.data && m.data.to === C.mePeer) R.emit('ta', Object.assign({ to: m.peer }, answer(m.data))).catch(() => {}); }, () => {}));
+    C.unsub.push(R.on('ta', (m) => { if (!m.sameTab && m.data && m.data.to === C.mePeer && m.peer === C.hostPeer) heard(m.data); }, () => {}));
+    C.unsub.push(R.on('no', (m) => { if (m.peer === C.hostPeer && m.data && m.data.to && m.data.to === C.mePeer) app.rejected(clip(m.data.reason, 120)); }, () => {}));
     C.unsub.push(R.on('chat', (m) => {
       if (m.sameTab || !m.data) return;
       const p = C.byPeer.get(m.peer); const text = clip(m.data.text, 160); if (!p || !text) return;
@@ -269,19 +317,21 @@ const RR_NET = (() => {
   }
   function peersChanged(ch) {
     if (!st.commons || !st.active) return;
-    const mine = app.me().pid, live = new Map();
+    const mine = app.me().pid, live = new Map(), twins = new Map();
     for (const p of ch.peers) {
       if (p.sameTab) { C.mePeer = p.peer; continue; }
       if (p.kind !== 'viewer') continue;
       const pr = p.presence || {}, pid = clip(pr.pid, 30);
-      if (!pid || pid === mine) continue;                               // not walked in yet, or your own other tab
+      if (!pid) continue;                                                // not walked in yet
+      // your own other tab: not another reader to draw, but it may hold the pen (two pens would split the library)
+      if (pid === mine) { twins.set(p.peer, { pid, name: clip(pr.name, 14) || 'Reader', since: +pr.since || 0, w: !!pr.w }); continue; }
       live.set(p.peer, { pid, name: clip(pr.name, 14) || 'Reader', avatar: clip(pr.avatar, 12), since: +pr.since || 0, w: !!pr.w, d: pr.d && typeof pr.d === 'object' ? pr.d : null });
     }
     const left = [];
     for (const [peer, o] of C.byPeer) if (!live.has(peer) || live.get(peer).pid !== o.pid) left.push(o);
     const fresh = [];
     for (const [peer, o] of live) { const old = C.byPeer.get(peer); if (!old || old.pid !== o.pid) fresh.push(o); }
-    C.byPeer = live;
+    C.byPeer = live; C.twins = twins;
     elect();                                                             // before departures, so a new pen-holder tidies up after the old
     for (const o of left) {
       app.peerLeft(o.pid, o.name);
@@ -297,9 +347,11 @@ const RR_NET = (() => {
     let best = null;
     const consider = (since, peer) => { if (since && (!best || since < best[0] || (since === best[0] && peer < best[1]))) best = [since, peer]; };
     for (const [peer, o] of C.byPeer) if (o.w) consider(o.since, peer);
+    for (const [peer, o] of (C.twins || [])) if (o.w) consider(o.since, peer);
     if (C.w) consider(C.since, C.mePeer);
     C.hostPeer = best ? best[1] : null;
     const amHost = !!best && !!C.since && best[0] === C.since && best[1] === C.mePeer;
+    clockStart(amHost ? null : C.hostPeer);              // the pen's own clock is the clock; the others measure theirs against it
     if (amHost === st.isHost) return;
     st.isHost = amHost;
     app.role(amHost);
@@ -362,7 +414,7 @@ const RR_NET = (() => {
       seat: d.seat ? clip(d.seat, 24) : null, sry: d.sry == null ? null : n(d.sry, -50, 50), reading: d.reading ? clip(d.reading, 60) : null };
   }
   function sanitizeNote(n) {
-    return { id: clip(n.id, 30), ch: Math.max(0, n.ch | 0), b: Math.max(0, n.b | 0), quote: clip(n.quote, 400), text: clip(n.text, 1200), t: +n.t || Date.now() };
+    return { id: clip(String(n.id == null ? '' : n.id).replace(/[^A-Za-z0-9_-]/g, ''), 30) || 'n' + (+n.t || 0).toString(36), ch: Math.max(0, n.ch | 0), b: Math.max(0, n.b | 0), quote: clip(n.quote, 400), text: clip(n.text, 1200), t: +n.t || Date.now() };
   }
   function send(op) {
     if (st.commons) { if (st.active && C.room) C.room.emit('req', { op }).catch((e) => { if (e && e.code === 'not_permitted') app.rejected('You can look around, but only readers the owner lets in can move things here.'); }); return; }
@@ -401,7 +453,7 @@ const RR_NET = (() => {
     if (hostConn) { try { hostConn.close(); } catch (e) {} hostConn = null; }
     if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
   }
-  function reset() { st.active = false; st.connecting = false; st.isHost = false; st.code = null; st.commons = false; }
+  function reset() { st.active = false; st.connecting = false; st.isHost = false; st.code = null; st.commons = false; clockStop(); }
   function end(reason) {
     clearTimeout(joinTimer);
     const was = st.active || st.connecting;
@@ -415,5 +467,5 @@ const RR_NET = (() => {
   }
   addEventListener('pagehide', () => { if (st.commons) { if (st.isHost) { clearTimeout(C.saveT); C.saving = null; saveNow(); } return; } if (st.isHost) toGuests({ t: 'bye' }); });
 
-  return { init, state, host, join, leave, send, broadcastOp, presence, chat, note, noteChange, link, detect, commons, people };
+  return { init, state, host, join, leave, send, broadcastOp, presence, chat, note, noteChange, link, detect, commons, people, penNow, clock };
 })();

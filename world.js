@@ -843,7 +843,7 @@ const RR_WORLD = (() => {
     fk.box(M.mahogany, 0.42, 0.36, 0.16, 0, 1.725, fzB + 0.82);
     fk.add(G.cyl, M.mahogany, 0, 1.9, fzB + 0.82, Math.PI / 2, 0, 0, 0.42, 0.16, 0.3);
     fk.build(scene);
-    fixedColliders.push({ x: 0, z: fzB + 0.31, hw: 2.1, hd: 0.31, r: 0 }, { x: 0, z: fzB + 0.85, hw: 1.55, hd: 0.25, r: 0 });
+    fixedColliders.push({ x: 0, z: fzB + 0.31, hw: 2.1, hd: 0.31, r: 0 }, { x: 0, z: fzB + 0.85, hw: 1.55, hd: 0.25, r: 0, h: 0.5 });
     const sank = new T.Mesh(new T.PlaneGeometry(1.36, 1.36), std({ map: tex(sankofaCanvas()), roughness: 0.6, metalness: 0.15 }));
     sank.position.set(0, 3.0, fzB + 0.685); scene.add(sank);
     // fire: emissive embers + flame cards
@@ -954,7 +954,7 @@ const RR_WORLD = (() => {
     [-0.24, 0.24].forEach(dz2 => lk.add(G.box, M.oak, lx + 0.24, 1.6, lz + dz2, 0, 0, -0.28, 0.06, 3.3, 0.06));
     for (let i = 0; i < 9; i++) { const y = 0.3 + i * 0.34; lk.add(G.cyl8, M.oak, lx - 0.22 + y * 0.288, y, lz, Math.PI / 2, 0, 0, 0.03, 0.5, 0.03); }
     lk.build(scene);
-    fixedColliders.push({ x: x1 - 1.25, z: lz, hw: 0.3, hd: 0.3, r: 0 });
+    fixedColliders.push({ x: x1 - 1.25, z: lz, hw: 0.3, hd: 0.3, r: 0, h: 0 });
 
     // chandeliers
     [-5, 5].forEach(x => {
@@ -1127,6 +1127,12 @@ const RR_WORLD = (() => {
   }
   // the way from (sx, sz) to within reach of (tx, tz): corner points to walk through, the last one in reach
   // (ok) or, when nothing in reach can be got to, as near as the floor allows
+  // how much room there is round a point of the floor (metres to the nearest thing; 0 inside something)
+  function clearAt(x, z) {
+    const { x0, z0, nx, nz, clr } = floorGrid();
+    const i = Math.floor((x - x0) / CELL), j = Math.floor((z - z0) / CELL);
+    return i < 0 || j < 0 || i >= nx || j >= nz ? 0 : clr[j * nx + i];
+  }
   function plan(sx, sz, tx, tz, reach) {
     const { x0, z0, nx, nz, clr } = floorGrid(), N = nx * nz;
     const cell = (x, z) => Math.max(0, Math.min(nz - 1, Math.floor((z - z0) / CELL))) * nx + Math.max(0, Math.min(nx - 1, Math.floor((x - x0) / CELL)));
@@ -1199,6 +1205,43 @@ const RR_WORLD = (() => {
     }
     if (cells.length > 1) pts.push({ x: cx(end), z: cz(end) });
     return { pts, ok };
+  }
+  // The third-person camera looks over the reader's shoulder from behind. The line from the head back to where the
+  // camera wants to be stops at the first wall, bookcase or piece of furniture tall enough to be in the way (a
+  // little in front of it), so the screen never fills with the inside of a bookcase. Returns the fraction of the
+  // way back the camera may go. Heights in metres; a lamp's pole is too thin to matter.
+  const FURN_H = { armchair: 1.15, sofa: 0.95, chair: 1.0, table: 0.8, roundtable: 0.7, desk: 1.0, coffeetable: 0.5, lamp: 0, bookcase: 2.3, plant: 1.3, ottoman: 0.5, globe: 1.15 };
+  function segRect(hx, hz, dx, dz, c, m) {       // where a segment (0..1) first enters a grown rectangle; null if never, or if it starts inside
+    const co = Math.cos(c.r || 0), si = Math.sin(c.r || 0), px = hx - c.x, pz = hz - c.z;
+    const ox = co * px - si * pz, oz = si * px + co * pz, vx = co * dx - si * dz, vz = si * dx + co * dz;
+    const ex = c.hw + m, ez = c.hd + m;
+    if (Math.abs(ox) <= ex && Math.abs(oz) <= ez) return null;
+    let t0 = 0, t1 = 1;
+    for (const [o, v, e] of [[ox, vx, ex], [oz, vz, ez]]) {
+      if (Math.abs(v) < 1e-9) { if (Math.abs(o) > e) return null; continue; }
+      let a = (-e - o) / v, b = (e - o) / v; if (a > b) { const t = a; a = b; b = t; }
+      t0 = Math.max(t0, a); t1 = Math.min(t1, b); if (t0 > t1) return null;
+    }
+    return t0;
+  }
+  function camReach(hx, hy, hz, cx, cy, cz, stand) {
+    const dx = cx - hx, dz = cz - hz, len = Math.hypot(dx, dz);
+    if (len < 0.05) return 1;
+    let t = 1;
+    const as = openAreas(), open = (x, z, m) => as.some(a => inArea(a, x, z, m));
+    if (open(hx, hz, 0)) {                       // the walls: the open floor, walked in steps of 8 cm
+      const n = Math.ceil(len / 0.08);
+      for (let i = 1; i <= n; i++) { const f = i / n; if (!open(hx + dx * f, hz + dz * f, 0.06)) { t = (i - 1) / n; break; } }
+    }
+    for (const c of colliders()) {
+      const info = c.id ? furn.get(c.id) : null;
+      const h = c.h != null ? c.h : info ? (FURN_H[info.f.type] != null ? FURN_H[info.f.type] : 1.2) : 3.2;
+      if (h <= 0) continue;
+      const f = segRect(hx, hz, dx, dz, c, 0.14); if (f == null || f >= t) continue;
+      if (hy + (cy - hy) * f > h + 0.1) continue;   // the line of sight passes over it
+      t = f;
+    }
+    return t >= 1 ? 1 : Math.max(0, t - (stand || 0) / len);
   }
   function clampCam(x, y, z) {
     const p = walk(x, z, 0.25);
@@ -1462,7 +1505,7 @@ const RR_WORLD = (() => {
     for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + Math.PI / 4; kk.add(G.cyl, M.brass, Math.cos(a) * 0.85, 1.22, Math.sin(a) * 0.85, 0, 0, 0, 0.03, 0.26, 0.03); kk.add(G.halfCyl, M.greenGlass, Math.cos(a) * 0.85, 1.38, Math.sin(a) * 0.85, 0, a, Math.PI / 2, 0.16, 0.36, 0.16); }
     kk.build(cat);
     const catHit = new T.Mesh(G.cyl, M.hit); catHit.scale.set(2.5, 1.3, 2.5); catHit.position.y = 0.65; catHit.userData.pick = { kind: 'catalog' }; cat.add(catHit); caseHits.push(catHit);
-    fixedColliders.push({ x: cx, z: cz, hw: 1.25, hd: 1.25, r: 0 });
+    fixedColliders.push({ x: cx, z: cz, hw: 1.25, hd: 1.25, r: 0, h: 1.45 });
     { const src = new T.Object3D(); src.position.set(cx, 1.8, cz); hallGroup.add(src); lampSources.push({ obj: src, info: { lamp: { local: V3(0, 0, 0), k: 1.6 } } }); }
     { const src = new T.Object3D(); src.position.set(cx, 3.2, z1 + 1.4); hallGroup.add(src); lampSources.push({ obj: src, info: { lamp: { local: V3(0, 0, 0), k: 1.0 } } }); }
     // benches round the catalog, facing it
@@ -1478,7 +1521,7 @@ const RR_WORLD = (() => {
         const hit = new T.Mesh(G.box, M.hit); hit.scale.set(0.85, 0.5, 0.55); hit.position.set(sx, 0.3, sz); hit.rotation.y = ry;
         hit.userData.pick = { kind: 'fseat', key: 'w' + i }; hallGroup.add(hit); caseHits.push(hit);
       });
-      fixedColliders.push({ x, z, hw: 0.92, hd: 0.27, r: ry, c: Math.cos(ry), s: Math.sin(ry) });
+      fixedColliders.push({ x, z, hw: 0.92, hd: 0.27, r: ry, c: Math.cos(ry), s: Math.sin(ry), h: 0.6 });
     });
     bkB.build(hallGroup);
     // the doors to the gallery, in the east of the ring
@@ -1589,8 +1632,8 @@ const RR_WORLD = (() => {
       lab.position.set(0, 0.93 + 0.018 * Math.cos(0.96), 0.74 + 0.018 * Math.sin(0.96)); lab.rotation.x = -0.96; g.add(lab);
       lk.addM(G.box, M.bulb, mtx(0, 1.41, 0, 0, 0, 0, 1.3, 0.01, 0.03).premultiply(g.matrixWorld));
       const hit = new T.Mesh(G.box, M.hit); hit.scale.set(1.6, 1.5, 1.45); hit.position.set(0, 0.75, 0.3); hit.userData.pick = { kind: 'exhibit', id: b.id, head: ex.head }; g.add(hit); caseHits.push(hit);
-      fixedColliders.push({ x, z, hw: 0.8, hd: 0.42, r: ry, c: Math.cos(ry), s: Math.sin(ry) });
-      fixedColliders.push({ x, z: z + Math.cos(ry) * 0.74, hw: 0.5, hd: 0.2, r: ry, c: Math.cos(ry), s: Math.sin(ry) });
+      fixedColliders.push({ x, z, hw: 0.8, hd: 0.42, r: ry, c: Math.cos(ry), s: Math.sin(ry), h: 1.5 });
+      fixedColliders.push({ x, z: z + Math.cos(ry) * 0.74, hw: 0.5, hd: 0.2, r: ry, c: Math.cos(ry), s: Math.sin(ry), h: 1.0 });
       if (n % 2 === 0) { const src = new T.Object3D(); src.position.set(x, 2.6, czg); galleryGroup.add(src); lampSources.push({ obj: src, info: { lamp: { local: V3(0, 0, 0), k: 1.7 } } }); }
     });
     ek.build(galleryGroup); lk.build(galleryGroup);
@@ -2058,7 +2101,7 @@ const RR_WORLD = (() => {
 
   return {
     setOwn, setLit,
-    init, ROOM, CATALOG, SECTIONS, SEC, EXHIBITS, walk, footprintOK, plan, clampCam, setDoors, doorsOpen, spawn, place, despawn, layoutBooks, setRibbons, pick, highlight, rowBox, spotBox, colliders, seatList, tick, bookDims,
+    init, ROOM, CATALOG, SECTIONS, SEC, EXHIBITS, walk, footprintOK, plan, clearAt, clampCam, camReach, setDoors, doorsOpen, spawn, place, despawn, layoutBooks, setRibbons, pick, highlight, rowBox, spotBox, colliders, seatList, tick, bookDims,
     bookMesh: (id) => (bookObj.get(id) || {}).mesh, bookInfo: (id) => bookObj.get(id), rowInfo: (id) => rows.get(id), furnInfo: (id) => furn.get(id),
     rows, furn, M, G, get scene() { return scene; },
     caseHits, fixedColliders   // fixtures other scripts add (cinema.js): pickable meshes, and footprints you walk round

@@ -1,6 +1,6 @@
 # The Reading Room
 
-A walkable 3D library of 409 public-domain books, centred on the slave narratives and the Black canon: https://library.jordanstrudwick.com/
+A walkable 3D library of 421 public-domain books, centred on the slave narratives and the Black canon: https://library.jordanstrudwick.com/
 
 This repository is the published website only, built from the arcade's `library/` with `deploy/site/build.js`. Where every text comes from, and every change made to it, is in [SOURCES.md](SOURCES.md).
 

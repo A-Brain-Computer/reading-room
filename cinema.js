@@ -47,6 +47,13 @@ const RR_CINEMA = (() => {
   const orig = (h, f) => UP + h + '/' + f;
   const v480 = (h, f) => UP + 'transcoded/' + h + '/' + f + '/' + f + '.480p.vp9.webm';
   const page = (f) => 'https://commons.wikimedia.org/wiki/File:' + f;
+  // the next lighter copy Commons keeps of a film (its master -> 480p -> 360p -> 240p VP9), for a line too slow for this one
+  function lighter(url) {
+    let m = /^(https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)transcoded\/([0-9a-f]\/[0-9a-f]{2})\/([^/]+)\/\3\.(\d+)p\.vp9\.webm$/.exec(url || '');
+    if (m) { const next = { 480: 360, 360: 240 }[m[4]]; return next ? m[1] + 'transcoded/' + m[2] + '/' + m[3] + '/' + m[3] + '.' + next + 'p.vp9.webm' : null; }
+    m = /^(https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/)([0-9a-f]\/[0-9a-f]{2})\/([^/]+\.webm)$/.exec(url || '');
+    return m ? m[1] + 'transcoded/' + m[2] + '/' + m[3] + '/' + m[3] + '.480p.vp9.webm' : null;
+  }
   const FILMS = [
     { title: 'A Natural Born Gambler', year: 1916, by: 'Bert Williams', mins: 23,
       note: 'Broadway star Bert Williams directs himself in his famous pantomime, a poker game played alone in a jail cell. He wears the blackface make-up his era demanded.',
@@ -102,8 +109,9 @@ const RR_CINEMA = (() => {
     if (!s || typeof s !== 'object') return null;
     const kind = s.kind === 'youtube' ? 'youtube' : 'file';
     const src = kind === 'youtube' ? (YT_ID.test(String(s.src || '')) ? String(s.src) : '') : httpUrl(s.src);
-    const out = { down: !!s.down, src, kind, title: src ? (clip(s.title, 120) || 'A film') : '', playing: false, pos: src ? num(s.pos, -10, 86400, 0) : 0, at: Math.min(now, num(s.at, 0, 1e13, now)) };
+    const out = { down: !!s.down, src, kind, title: src ? (clip(s.title, 120) || 'A film') : '', playing: false, pos: src ? num(s.pos, -10, 86400, 0) : 0, at: Math.min(now + 600e3, num(s.at, 0, 1e13, now)) };
     out.playing = !!(s.playing && src && out.down);
+    if (Number.isSafeInteger(s.seq) && s.seq > 0) out.seq = s.seq;
     if (out.playing && now - out.at > 12 * 3600e3) { out.playing = false; out.pos = 0; }   // left running long ago
     return out.down || out.src ? out : null;
   }
@@ -113,7 +121,15 @@ const RR_CINEMA = (() => {
   function applyOp(room, op) {
     if (op.src && op.kind === 'youtube' && !YT_ID.test(String(op.src))) return 'That is not a YouTube video the screen can show.';
     if (op.src && op.kind !== 'youtube' && !httpUrl(op.src)) return 'Only http and https links can be shown.';
-    room.screen = clean(Object.assign({}, op, { at: Date.now() }), Date.now());
+    if (!(typeof op.at === 'number' && isFinite(op.at))) {
+      // the first to apply a change stamps it, once, on the pen's clock (the pen itself, or you alone), and the
+      // stamp travels with the change to everyone; a start or a resume is stamped a moment ahead (its cue), so
+      // every screen starts together on the same frame instead of each catching up by its own delay
+      const cue = typeof op.cue === 'number' && isFinite(op.cue) ? Math.max(0, Math.min(8, op.cue)) : 0;
+      op.at = Math.round(penNow() + cue * 1000);
+      if (isHost()) op.seq = ((room.screen && room.screen.seq) || 0) + 1;
+    } else if (Number.isSafeInteger(op.seq) && room.screen && room.screen.seq >= op.seq) return true;   // overtaken by a newer change on the way
+    room.screen = clean(Object.assign({}, op), Date.now());
     return true;
   }
 
@@ -167,7 +183,7 @@ body:not(.playing) #cineHud,body.reading #cineHud{display:none}
 #cineHud small{color:var(--dim);font-weight:600;font:600 11px ui-monospace,Menlo,monospace}
 #cineHold{position:fixed;width:2px;height:2px;right:0;bottom:0;overflow:hidden;opacity:.01;pointer-events:none;z-index:-1}
 #cineFull{position:fixed;width:2px;height:2px;right:0;bottom:0;overflow:hidden;z-index:-1}
-#cineOver{position:fixed;left:0;top:0;width:0;height:0;overflow:visible;z-index:1;pointer-events:none}
+#cineOver{position:fixed;left:0;top:0;width:0;height:0;overflow:visible;z-index:0;pointer-events:none}
 #cineOver video{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;background:#000;object-fit:fill;max-width:none}
 body:not(.playing) #cineOver,body.reading #cineOver{display:none}
 #cineFull video{width:100%;height:100%;object-fit:contain;background:#000}
@@ -311,7 +327,8 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
   function fabricCanvas() {
     const c = cv(512, 402), g = c.getContext('2d');
     g.fillStyle = '#0a0a0a'; g.fillRect(0, 0, 512, 402);
-    const x0 = Math.round(512 * (SCR.w - SCR.pw) / 2 / SCR.w), y0 = Math.round(402 * (SCR.L - SCR.pb - SCR.ph) / SCR.L), y1 = Math.round(402 * (SCR.L - SCR.pb) / SCR.L);
+    // the light area a pixel inside the picture's edge: rounded outward, a sub-pixel strip of it crawled round every film
+    const x0 = Math.ceil(512 * (SCR.w - SCR.pw) / 2 / SCR.w) + 1, y0 = Math.ceil(402 * (SCR.L - SCR.pb - SCR.ph) / SCR.L) + 1, y1 = Math.floor(402 * (SCR.L - SCR.pb) / SCR.L) - 1;
     g.fillStyle = '#ecE7dc'; g.fillRect(x0, y0, 512 - 2 * x0, y1 - y0);
     for (let i = 0; i < 2600; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,255,255'},${Math.random() * 0.05})`; g.fillRect(x0 + Math.random() * (512 - 2 * x0), y0 + Math.random() * (y1 - y0), 1, 1 + Math.random() * 3); }
     return c;
@@ -417,10 +434,14 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
       .add(G.torus, M.brass, 0, -0.1, 0.015, 0, 0, 0, 0.11, 0.11, 0.11).build(bar);
     // what the lamp throws on it: a dim field (the projector's black) and the picture
     O.pic = new T.Group(); O.pic.position.set(0, PIC_Y, z); root.add(O.pic);
-    O.field = new T.Mesh(new T.PlaneGeometry(SCR.pw, SCR.ph), new T.MeshBasicMaterial({ color: 0x0f0e0c, transparent: true, opacity: 0, toneMapped: false }));
+    O.field = new T.Mesh(new T.PlaneGeometry(SCR.pw, SCR.ph), new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, toneMapped: false, fog: false }));
     O.field.position.z = 0.004; O.pic.add(O.field);
     cardC = cv(1024, 768); cardTex = ctex(cardC);
-    O.picMat = new T.MeshBasicMaterial({ map: cardTex, transparent: true, opacity: 0, toneMapped: false });
+    O.picMat = new T.MeshBasicMaterial({ map: cardTex, transparent: true, opacity: 0, toneMapped: false, fog: false });
+    // the overlay's window: where the <video> behind the canvas shows through. It writes transparent black, with the
+    // depth test, after everything else, so whoever stands in front of the screen stays in front of the film, and the
+    // film's visible edge is the canvas's own antialiased edge. Its alpha is the lamp: the film fades in and out.
+    O.holeMat = new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 1, blending: T.NoBlending, depthTest: true, depthWrite: false, toneMapped: false, fog: false });
     O.picture = new T.Mesh(new T.PlaneGeometry(1, 1), O.picMat); O.picture.position.z = 0.008; O.picture.scale.set(SCR.pw, SCR.ph, 1); O.pic.add(O.picture);
     O.pic.visible = false;
     O.screenHit = hit(SCR.w, SCR.L, 0.06, 0, SCR.roll - SCR.L / 2, z, 'screen', root);
@@ -507,7 +528,7 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
     O.column.visible = O.proj.visible; O.column.scale.y = Math.max(0.01, y - 0.14); O.column.position.y = (y + 0.14) / 2;
     const hh = STAND.h + 0.04 + (y - PROJ.down) * 0.75; O.standHit.scale.y = hh; O.standHit.position.y = hh / 2;   // the risen projector is part of it
     const L = A.lamp;
-    O.pic.visible = L > 0.003; O.picMat.opacity = L; O.field.material.opacity = L * 0.92;
+    O.pic.visible = L > 0.003; O.picMat.opacity = L; O.field.material.opacity = L; O.holeMat.opacity = 1 - L;
     O.beam.visible = L > 0.003; O.beamMat.uniforms.uO.value = L;
     O.lens.material.color.setRGB(0.1 + 0.9 * L, 0.13 + 0.82 * L, 0.19 + 0.6 * L);
     O.reels.forEach((r, i) => { r.rotation.x = A.reel * (i ? 1 : 1.35); });
@@ -534,7 +555,13 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
   const now = () => performance.now();
   const shared = () => !!(ctx && ctx.shared && ctx.shared());
   const isHost = () => !ctx || !ctx.host || ctx.host();
-  const expected = () => (cur ? (cur.playing ? cur.pos + (Date.now() - cur.at) / 1000 : cur.pos) : 0);
+  // the pen's clock (net.js measures it against ours; alone, it is ours)
+  const penNow = () => (ctx && ctx.penNow ? ctx.penNow() : Date.now());
+  // the film's place on this page's own steady clock: the stamp, on the pen's clock, becomes a moment of
+  // performance.now() once, so a wall clock that jumps can't move a running film, and a better measure of the
+  // pen's clock (reclock) moves it by just the difference
+  const anchor = (c) => { if (c) c.t0 = now() - (penNow() - c.at); };
+  const expected = () => (cur ? (cur.playing ? cur.pos + (now() - cur.t0) / 1000 : cur.pos) : 0);
   const screenReady = () => A.k > 0.995 && A.lamp > 0.6;
   const inWindow = () => F && (F.kind === 'youtube' || F.mode === 'dom');
   function localTime() {
@@ -554,6 +581,7 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
     const key = s ? JSON.stringify(s) : '';
     if (key === curKey) return;
     const prev = cur; cur = s ? Object.assign({}, s) : null; curKey = key;
+    anchor(cur);
     changed(prev, cur);
     if (syncs === 1) { A.k = A.lift = A.lid = A.lamp = want.down ? 1 : 0; pose(); }   // a room you open is as it was left
   }
@@ -586,9 +614,11 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
     if (vtex) { vtex.dispose(); vtex = null; }
     if (O.picMat) O.picMat.map = cardTex;
     F = null; watching = false;
+    syncReset(); setRate(1);
   }
 
   /* --- the <video>: made on first use, copied onto the screen when its server allows (CORS), else laid over it --- */
+  let scrubT = 0;
   function ensureVideo() {
     if (video) return video;
     video = document.createElement('video');
@@ -597,15 +627,24 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
     const mineEv = (fn) => (e) => { if (F && F.kind === 'file' && F.url && video.src === F.url) fn(e); };
     video.addEventListener('loadedmetadata', mineEv(onMeta));
     video.addEventListener('error', mineEv(onErr));
-    video.addEventListener('playing', mineEv(() => { F.frame = true; paint(); wake(); }));   // the loop may have slept while it loaded
-    video.addEventListener('seeked', mineEv(() => { F.frame = true; relayFrame(); wake(); }));
-    video.addEventListener('resize', mineEv(() => { if (F.mode === 'over') { if (video.parentNode === $('#cineOver')) sizeOver(); paint(); return; } if (F.mode === 'tex' && relayC && (relayC.width < 3 || Math.abs(relayC.width / relayC.height - video.videoWidth / Math.max(1, video.videoHeight)) > 0.01)) { makeRelay(); relayFrame(); paint(); } }));
+    video.addEventListener('playing', mineEv(() => { landed(); F.frame = true; paint(); wake(); }));   // the loop may have slept while it loaded
+    video.addEventListener('seeked', mineEv(() => {
+      F.frame = true; relayFrame(); if (video.paused || video.readyState >= 3) landed(); wake();
+      if (SY.scrub === Infinity) {                       // the reader let go of the bar: one change for the room, where they let go
+        clearTimeout(scrubT);
+        scrubT = setTimeout(() => { SY.scrub = now() + 1000; if (cur && cur.src && Math.abs(video.currentTime - expected()) > 0.5) setScreen({ pos: video.currentTime }); }, 300);
+      }
+    }));
+    video.addEventListener('resize', mineEv(() => { if (F.mode === 'over') { if (video.parentNode === $('#cineOver')) sizeOver(); paint(); return; } if (F.mode === 'tex' && relayC && relayC.width < 3) { makeRelay(); relayFrame(); paint(); } }));
     video.addEventListener('waiting', mineEv(() => paint()));
     video.addEventListener('ended', mineEv(onEnded));
     // in the window or full screen, the player's own buttons work for the whole room; its sound is yours alone
-    video.addEventListener('pause', mineEv(() => { if (steering() && now() - own.pause > 900 && cur && cur.playing && !video.ended) setScreen({ playing: false, pos: video.currentTime }); }));
+    // a pause that isn't the page's own: from the player's buttons in the window or full screen (for the whole room),
+    // or, watching alone, from outside (headphones, the system's controls, a phone pausing a page it hid)
+    video.addEventListener('pause', mineEv(() => { if ((steering() || !shared()) && now() - own.pause > 900 && cur && cur.playing && !video.ended && !(video.readyState < 2 && !steering())) { SY.intent = { playing: false, until: now() + 3000 }; setScreen({ playing: false, pos: video.currentTime }); } }));
     video.addEventListener('play', mineEv(() => { if (steering() && now() - own.play > 900 && cur && !cur.playing) setScreen({ down: true, playing: true, pos: video.currentTime }); }));
-    video.addEventListener('seeking', mineEv(() => { if (steering() && now() - own.seek > 900 && cur && Math.abs(video.currentTime - expected()) > 2) setScreen({ pos: video.currentTime }); }));
+    // scrubbing in the window or full screen: no corrections while the hand is on the bar (seeked sends the change)
+    video.addEventListener('seeking', mineEv(() => { if (steering() && now() - own.seek > 900 && cur) { SY.scrub = Infinity; clearTimeout(scrubT); } }));
     video.addEventListener('volumechange', mineEv(() => {
       if (now() - sysAt < 400 || !steering()) return;
       if (Math.abs(video.volume - vol) > 0.005) { vol = video.volume; mem.vol = vol; }
@@ -629,7 +668,7 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
     if (F.cors && !blindBrowser && !APPLE) {
       F.mode = 'tex'; probeT = -1; blank = 0; dark = 0; darkSig = '';
       if (!fullVid && !viewOpen && video.parentNode !== $('#cineHold')) { video.style.cssText = ''; $('#cineHold').appendChild(video); }
-      makeRelay();
+      makeRelay(); watchFrames();
     } else toOver();                                     // Safari, or a server that won't share its pixels: the overlay
     drive(true); paint();
   }
@@ -652,15 +691,27 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
   /* --- the 3D screen shows each frame copied through a canvas. Safari (iPhone, iPad and Mac) plays these films and
          draws them onto a canvas, but its direct video-to-WebGL path can leave the screen black. --- */
   function makeRelay() {
-    const vw = video.videoWidth || 640, vh = video.videoHeight || 480, k = Math.min(1, 1024 / Math.max(vw, vh));
+    // a power of two each way (1024 x 512: the picture's own shape comes from its mesh), so the texture can keep
+    // mipmaps: drawn small on the screen, a film without them shimmers and moires at every step
+    const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
     relayC = relayC || document.createElement('canvas');
-    relayC.width = Math.max(2, Math.round(vw * k)); relayC.height = Math.max(2, Math.round(vh * k));
+    relayC.width = 1024; relayC.height = vh / vw > 0.9 ? 1024 : 512;
     relayG = relayC.getContext('2d', { alpha: false });
     relayG.fillStyle = '#000'; relayG.fillRect(0, 0, relayC.width, relayC.height);
     if (vtex) vtex.dispose();
-    vtex = new T.CanvasTexture(relayC); vtex.colorSpace = T.SRGBColorSpace; vtex.minFilter = T.LinearFilter; vtex.generateMipmaps = false;
+    vtex = new T.CanvasTexture(relayC); vtex.colorSpace = T.SRGBColorSpace; vtex.minFilter = T.LinearMipmapLinearFilter; vtex.generateMipmaps = true;
+    vtex.anisotropy = Math.min(4, ctx.renderer.capabilities.getMaxAnisotropy ? ctx.renderer.capabilities.getMaxAnisotropy() : 1);
     texAt = -1;
   }
+  // a new frame of the film is copied when the browser presents one (requestVideoFrameCallback: 24 a second for a
+  // 24 fps film, not every frame of the room); where it is missing, or silent for a hidden video, step() copies
+  // whenever the film's time has moved
+  let rvfcOn = false, rvfcAt = -1e9;
+  function frameCb() {
+    rvfcAt = now();
+    if (F && F.mode === 'tex' && video) { relayFrame(); video.requestVideoFrameCallback(frameCb); } else rvfcOn = false;
+  }
+  function watchFrames() { if (!rvfcOn && video && video.requestVideoFrameCallback) { rvfcOn = true; video.requestVideoFrameCallback(frameCb); } }
   function relayFrame() {
     if (!vtex || !relayG || !video || video.readyState < 2) return;
     try { relayG.drawImage(video, 0, 0, relayC.width, relayC.height); vtex.needsUpdate = true; texAt = video.currentTime; } catch (e) {}
@@ -683,32 +734,57 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
   }
   // out of sight: tiny and clear rather than visibility:hidden, which an iPhone may take as "don't play"
   function hideOver() { if (video.style.opacity !== '0') { video.style.opacity = '0'; video.style.transform = 'scale(0.004)'; } }
-  // the 3x3 projective map taking the video's corners (0,0) (w,0) (0,h) (w,h) to four points on the page, as CSS
-  function warp(w, h, q) {
-    const adj = (m) => [m[4] * m[8] - m[5] * m[7], m[2] * m[7] - m[1] * m[8], m[1] * m[5] - m[2] * m[4], m[5] * m[6] - m[3] * m[8], m[0] * m[8] - m[2] * m[6], m[2] * m[3] - m[0] * m[5], m[3] * m[7] - m[4] * m[6], m[1] * m[6] - m[0] * m[7], m[0] * m[4] - m[1] * m[3]];
-    const mm = (a, b) => { const c = []; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) c.push(a[3 * i] * b[j] + a[3 * i + 1] * b[3 + j] + a[3 * i + 2] * b[6 + j]); return c; };
-    const mv = (m, v) => [m[0] * v[0] + m[1] * v[1] + m[2] * v[2], m[3] * v[0] + m[4] * v[1] + m[5] * v[2], m[6] * v[0] + m[7] * v[1] + m[8] * v[2]];
-    const basis = (p) => { const m = [p[0][0], p[1][0], p[2][0], p[0][1], p[1][1], p[2][1], 1, 1, 1], v = mv(adj(m), [p[3][0], p[3][1], 1]); return mm(m, [v[0], 0, 0, 0, v[1], 0, 0, 0, v[2]]); };
-    const t = mm(basis(q), adj(basis([[0, 0], [w, 0], [0, h], [w, h]])));
-    for (let i = 0; i < 9; i++) t[i] /= t[8];
-    return 'matrix3d(' + [t[0], t[3], 0, t[6], t[1], t[4], 0, t[7], 0, 0, 1, 0, t[2], t[5], 0, t[8]].join(',') + ')';
-  }
-  const _oc = [0, 1, 2, 3].map(() => new T.Vector3());
-  // main.js calls this right after it draws the room, so the video sits exactly on that frame's screen
-  function afterRender() {
-    if (!F || F.mode !== 'over' || !video || video.parentNode !== $('#cineOver')) return;
-    const cam = ctx.camera;
-    let show = !!O.overOn && screenReady() && cam.position.z < 8.3, q = null;   // not from the Great Hall, through its wall
-    if (show) {
-      q = [[-0.5, 0.5], [0.5, 0.5], [-0.5, -0.5], [0.5, -0.5]].map(([x, y], i) => { const v = _oc[i].set(x, y, 0); O.picture.localToWorld(v); v.project(cam); return v; });
-      if (q.some(v => v.z < -1 || v.z > 1)) show = false;                       // a corner behind you: no warp can draw it
+  let lastOver = 0, overGuard = 0;
+  /* main.js calls this just before it draws the room. The <video> lies behind the canvas; it is placed by the
+     camera's own matrices (video pixels -> the picture's plane -> the world -> the camera -> the page), so the film
+     stays on the screen from any pose, the browser clipping whatever lies behind you (the old warp from four
+     projected corners had to give up, and showed a black card, whenever one corner was behind the camera: by the
+     fire, in the doorway). The screen's picture becomes the window it shows through (O.holeMat); depth decides
+     what stands in front of it, so the Great Hall's wall hides it and your own reader stays in front. */
+  const _m1 = new T.Matrix4(), _m2 = new T.Matrix4(), _pv = new T.Vector4();
+  const CORNERS = [[-0.5, 0.5], [0.5, 0.5], [-0.5, -0.5], [0.5, -0.5]];
+  function beforeRender() {
+    if (!O.picture) return;
+    const inOver = !!(video && video.parentNode === $('#cineOver'));
+    let show = false;
+    if (inOver && F && F.mode === 'over' && cur && cur.src && O.overOn && A.lamp > 0.003) {
+      const cam = ctx.camera;
+      cam.updateMatrixWorld(); O.pic.updateMatrixWorld(true);
+      _m1.multiplyMatrices(cam.matrixWorldInverse, O.picture.matrixWorld);
+      let behind = 0;
+      for (const [x, y] of CORNERS) { _pv.set(x, y, 0, 1).applyMatrix4(_m1); if (_pv.z > -cam.near) behind++; }
+      show = behind < 4;
+      if (show) {
+        const el = ctx.renderer.domElement, w = el.clientWidth || innerWidth, h = el.clientHeight || innerHeight, b = 1.012;   // a hair larger than its window: no gap shows
+        _m2.set(b / overW, 0, 0, -b / 2, 0, -b / overH, 0, b / 2, 0, 0, 1, 0, 0, 0, 0, 1);         // video pixels -> the picture's plane
+        _m1.premultiply(cam.projectionMatrix).multiply(_m2);                                        // -> clip space
+        _m2.set(w / 2, 0, 0, w / 2, 0, -h / 2, 0, h / 2, 0, 0, 1, 0, 0, 0, 0, 1);                   // -> page pixels
+        const e = _m1.premultiply(_m2).elements;
+        e[2] = e[6] = e[14] = 0; e[8] = e[9] = e[11] = 0; e[10] = 1;   // depth flattened, the matrix kept invertible (or the page would not draw it)
+        video.style.transform = 'matrix3d(' + e.join(',') + ')';
+        if (video.style.opacity !== '1') video.style.opacity = '1';
+      }
     }
-    if (!show) { hideOver(); return; }
-    const el = ctx.renderer.domElement, w = el.clientWidth || innerWidth, h = el.clientHeight || innerHeight;   // where the frame is shown
-    video.style.transform = warp(overW, overH, q.map(v => [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h]));
-    video.style.opacity = String(Math.max(0.01, Math.min(1, A.lamp)));
+    if (inOver && !show) hideOver();
+    const mat = show ? O.holeMat : O.picMat;
+    if (O.picture.material !== mat) { O.picture.material = mat; O.picture.renderOrder = show ? 10 : 0; }
   }
-  function seekVideo(t) { if (!video || !isFinite(t)) return; mark('seek'); try { video.currentTime = Math.max(0, F.dur ? Math.min(t, F.dur - 0.05) : t); } catch (e) {} }
+  // ...and this right after: a room that stops drawing (a sheet, the reader) must not leave the film on the glass
+  // for tests: where the screen's picture is, in the world and on the page (its centre), if in front of the camera
+  function pictureOnPage() {
+    if (!O.picture) return null;
+    const cam = ctx.camera; cam.updateMatrixWorld(); O.pic.updateMatrixWorld(true);
+    const w = new T.Vector3(); O.picture.getWorldPosition(w);
+    const v = w.clone().project(cam), el = ctx.renderer.domElement;
+    return { world: [w.x, w.y, w.z], page: v.z > -1 && v.z < 1 ? [(v.x + 1) / 2 * (el.clientWidth || innerWidth), (1 - v.y) / 2 * (el.clientHeight || innerHeight)] : null };
+  }
+  function afterRender() {
+    if (!video || video.parentNode !== $('#cineOver')) return;
+    lastOver = now();
+    if (!F || F.mode !== 'over' || !cur || !cur.src) { hideOver(); return; }
+    if (!overGuard) overGuard = setInterval(() => { if (video && video.parentNode === $('#cineOver') && now() - lastOver > 400) hideOver(); }, 250);
+  }
+  function seekVideo(t) { if (!video || !isFinite(t)) return; mark('seek'); SY.seekT0 = now(); try { video.currentTime = Math.max(0, F.dur ? Math.min(t, F.dur - 0.05) : t); } catch (e) {} }
   function playVideo() {
     mark('play');
     const p = video.play();
@@ -904,32 +980,124 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
   }
   new MutationObserver(() => { if ($('#cineView').hidden && viewOpen) closeView(); }).observe($('#cineView'), { attributes: true, attributeFilter: ['hidden'] });
 
-  /* --- keep this copy's player where the room says the film is --- */
+  /* --- keep this copy's player where the room says the film is ---
+     One timeline for everyone (expected()). A copy that drifts from it is brought back by playing a little faster
+     or slower (at most 5%, the pitch kept), not by jumping. It jumps only when it is clearly elsewhere (1.5 s),
+     and then to where the room will be when the jump lands; never twice in 8 s, never while it is still loading.
+     On a line slower than the film it stops chasing and plays a little behind. Alone, the film keeps its own time.
+     Corrections run four times a second, on a timer of their own, so they go on while the room is not drawn. */
+  const SY = { ema: 0, on: false, above: 0, hold: 0, jumpAt: -1e9, seekT0: 0, seeks: [], slowSeekAt: -1e9, slowSince: 0, waitT0: 0, waits: [], tick: 0, said: false, scrub: 0, parkAt: -1e9, intent: null };
+  function syncReset() { Object.assign(SY, { ema: 0, on: false, above: 0, hold: 0, jumpAt: -1e9, seekT0: 0, slowSeekAt: -1e9, slowSince: 0, waitT0: 0, waits: [], tick: 0, said: false, scrub: 0, parkAt: -1e9, intent: null }); }
+  function setRate(r) { if (video && Math.abs(video.playbackRate - r) >= 0.004) { try { video.playbackRate = r; } catch (e) {} } }
+  // The share of the last 30 s this copy should have been playing but had nothing to show: loading, or a jump
+  // still landing. A line slower than the film shows here first, and so does a jump that took long.
+  function slowLine() {
+    const t = now(), from = t - 30000;
+    SY.waits = SY.waits.filter(iv => iv[1] > from);
+    let w = 0; for (const iv of SY.waits) w += iv[1] - Math.max(from, iv[0]);
+    if (SY.waitT0) w += t - Math.max(from, SY.waitT0);
+    return w / 30000;
+  }
+  function starving(yes) { const t = now(); if (yes) { if (!SY.waitT0) SY.waitT0 = t; } else endWait(); }
+  const slowNow = () => slowLine() > 0.15 || now() - SY.slowSeekAt < 60000;   // or a jump took more than 3 s within the minute
+  function seekLead() {                                  // how long a jump takes here: the middle of the last three
+    const a = SY.seeks.slice(-3).sort((x, y) => x - y);
+    return Math.max(0.15, Math.min(4, a.length ? a[a.length >> 1] : 0.3));
+  }
+  function inBuffer(t) { try { const b = video.buffered; for (let i = 0; i < b.length; i++) if (t >= b.start(i) && t <= b.end(i) - 0.5) return true; } catch (e) {} return false; }
+  function jump(exp) {                                   // to where the room will be by the time the jump lands
+    const lead = inBuffer(exp + 0.3) ? Math.min(0.3, seekLead()) : seekLead();
+    SY.jumpAt = now(); SY.ema = 0; SY.above = 0; SY.on = false; setRate(1);
+    seekVideo(exp + lead);
+  }
+  function landed() {
+    if (!SY.seekT0) return;
+    const d = (now() - SY.seekT0) / 1000;
+    SY.seeks.push(d); if (SY.seeks.length > 5) SY.seeks.shift();
+    if (d > 3) SY.slowSeekAt = now();
+    SY.seekT0 = 0; SY.hold = now() + 1200; SY.ema = 0;
+  }
+  function endWait() { if (SY.waitT0) { SY.waits.push([SY.waitT0, now()]); SY.waitT0 = 0; } }
+  // the line can't keep up with this copy: change to the next lighter one, where the room is now
+  function stepDown() {
+    const next = F && F.kind === 'file' && FILM_OF.get(F.src) ? lighter(F.url) : null;
+    if (!next || (F.tried || []).includes(next)) return false;
+    F.tried = (F.tried || []).concat(next);
+    F.list.splice(F.i, 0, next);                         // the copy it had stays next in line, should the lighter one fail
+    SY.waits = []; SY.waitT0 = 0; SY.slowSince = 0; SY.slowSeekAt = -1e9; SY.said = true;
+    ctx.toast('Your connection is slow for this film, so here it shows a lighter copy.', 3600);
+    loadSrc();
+    return true;
+  }
+  function correct(exp, force) {
+    const t = now();
+    starving(video.seeking || video.readyState < 3);
+    if (video.seeking || video.readyState < 3 || SY.scrub > t) { setRate(1); return; }   // loading, or steered by hand: wait
+    if (!shared()) {                                     // alone: the film is its own clock (a stall doesn't skip ahead)
+      setRate(1);
+      if (cur && Math.abs(video.currentTime - exp) > 0.25) { cur.pos = video.currentTime; cur.t0 = now(); }
+      return;
+    }
+    const err = video.currentTime - exp;
+    if (force && Math.abs(err) > 1) { jump(exp); return; }      // someone moved the film: go there at once
+    if (SY.started && t - SY.started > 300) {                    // just started: where is it really?
+      SY.started = 0;
+      if (Math.abs(err) > 0.25 && t - SY.jumpAt > 1500) { jump(exp); return; }
+    }
+    if (t < SY.hold || t - SY.tick < 240) return;
+    SY.tick = t;
+    SY.ema += 0.35 * (err - SY.ema);
+    const a = Math.abs(SY.ema), behind = SY.ema < 0, slow = slowNow();
+    if (slow) {
+      if (!SY.slowSince) SY.slowSince = t;
+      if (t - SY.slowSince > 8000 && stepDown()) return;   // a lighter copy of the film, if Commons has one
+      if (!SY.said) { SY.said = true; ctx.toast('Your connection is slower than this film, so here it plays a little behind the others.', 4200); }
+    } else SY.slowSince = 0;
+    if (a > 1.5) {
+      SY.above++;
+      if (SY.above >= 2 && t - SY.jumpAt > 8000 && !(slow && behind && a < 30)) { jump(exp); return; }
+      setRate(behind ? (slow ? 1 : 1.05) : 0.95);
+      return;
+    }
+    SY.above = 0;
+    if (!SY.on && a > 0.05) SY.on = true; else if (SY.on && a < 0.02) SY.on = false;   // two screens in one room may not echo
+    let r = SY.on ? 1 - Math.max(-0.05, Math.min(0.05, SY.ema / 8)) : 1;
+    if (slow && r > 1) r = 1;
+    setRate(r);
+  }
   function drive(force) {
     if (!cur || !F || !cur.src) return;
     const s = cur, exp = expected(), t = now();
     if (F.kind === 'file') {
       if (F.mode === 'idle') { if (s.playing) loadSrc(); else return; }
       if ((F.mode !== 'tex' && F.mode !== 'dom' && F.mode !== 'over') || !video || video.readyState < 1) return;
+      if (SY.intent) { if (SY.intent.playing === s.playing || t > SY.intent.until) SY.intent = null; else return; }   // your own pause, on its way to the room
       if (s.playing && F.dur && exp >= F.dur - 0.2 && !F.ended) { onEnded(); return; }    // the room's clock ran past the end
       const show = F.mode === 'tex' || F.mode === 'over' || (viewOpen && watching) || fullVid;
-      const go = s.playing && show && exp >= 0 && (F.mode === 'dom' || fullVid || viewOpen || screenReady()) && !(F.dur && exp >= F.dur - 0.2);
+      const begun = exp >= Math.max(0, s.pos) - 0.001;   // a start waits for its cue
+      const go = s.playing && show && begun && (F.mode === 'dom' || fullVid || viewOpen || screenReady()) && !(F.dur && exp >= F.dur - 0.2);
       if (go) {
-        if (video.paused) { if (Math.abs(video.currentTime - exp) > 0.75) seekVideo(exp); playVideo(); lastDrift = t; }
-        else if ((force || (shared() && t - lastDrift > 3000)) && !video.seeking) {   // allow ~2 s of drift between friends
-          lastDrift = t; if (Math.abs(video.currentTime - exp) > (force ? 0.75 : 2)) seekVideo(exp);
+        if (video.paused) {
+          // the cue has come and the film waits on its first frame: just play; arriving late: jump to the room first
+          if (!video.seeking && Math.abs(video.currentTime - exp) > 0.25) jump(exp);
+          playVideo(); SY.ema = 0; SY.started = t;
+          return;
         }
+        correct(exp, force);
       } else {
+        setRate(1); starving(false);
         if (!video.paused) { mark('pause'); video.pause(); }
-        const park = Math.max(0, s.playing ? exp : s.pos);
-        if (force && !(F.dur && park >= F.dur - 0.2) && Math.abs(video.currentTime - park) > 1) seekVideo(park);
+        // a paused room, or one about to start, waits on the very same frame everywhere
+        const exact = !s.playing || !begun, park = s.playing && begun ? exp : Math.max(0, s.pos);
+        const d = Math.abs(video.currentTime - park);
+        if (!video.seeking && !(F.dur && park >= F.dur - 0.2) && (exact ? d > 0.05 && (force || t - SY.parkAt > 1500) : force && d > 1)) { SY.parkAt = t; seekVideo(park); }
       }
     } else if (F.kind === 'youtube') {
       if (!Y || !Y.ready || !watching) return;
       const yt = localTime();
       if (s.playing && exp >= 0) {
         if (Y.state !== 1 && Y.state !== 3 && (force || t - ours > 1500)) { if (Math.abs(yt - exp) > 2) ytCmd('seekTo', [exp, true]); ytCmd('playVideo'); }
-        else if (Y.state === 1 && shared() && t - lastDrift > 4000) { lastDrift = t; if (Math.abs(yt - exp) > 3) ytCmd('seekTo', [exp, true]); }
+        else if (Y.state === 1 && shared() && t - lastDrift > 8000 && Math.abs(yt - exp) > 1.5) { lastDrift = t; ytCmd('seekTo', [exp + 1, true]); }
       } else if (Y.state === 1 && (force || t - ours > 1500)) {
         ytCmd('pauseVideo'); if (Math.abs(yt - Math.max(0, s.pos)) > 2) ytCmd('seekTo', [Math.max(0, s.pos), true]);
       }
@@ -939,42 +1107,54 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
   /* ---------------- asking the room to change ---------------- */
   function setScreen(patch) {
     const base = cur || { down: false, src: '', kind: 'file', title: '', playing: false, pos: 0 };
-    const s = Object.assign({}, base, patch); delete s.at;
+    const s = Object.assign({}, base, patch); delete s.at; delete s.t0; delete s.seq;
     if (!('pos' in patch) && base.playing) s.pos = expected();   // `at` is stamped afresh, so carry the film's place with it
     if (patch.src !== undefined) pending = { film: s.src ? s.kind + '|' + s.src : '', until: now() + 20000 };
     return ctx.doOp(Object.assign({ t: 'screen' }, s));
   }
-  // the lead-in: time for the screen to come down, the projector to rise and the film to load (none if it is all ready)
+  // the lead-in: time for the screen to come down, the projector to rise and the film to load (none if it is all ready);
+  // with friends, at least a second, so the change reaches every screen before the film starts on them all at once
   const lead = (src) => (screenReady() && F && F.src === src && (F.mode === 'tex' || F.mode === 'over') && video && video.readyState >= 3 ? 0 : A.k > 0.99 && A.lamp > 0.9 ? 1.2 : 3.6);
+  const cueFor = (kind, src) => (kind === 'youtube' ? 0 : Math.max(lead(src), shared() ? 1 : 0));
   function start(item) {
     const at = mem.at[item.src] || 0;
     ctx.closeSheets();                                   // first: a YouTube film opens its own window as the op lands
-    const ok = setScreen({ down: true, src: item.src, kind: item.kind, title: item.title, playing: true, pos: (item.start || at) - (item.kind === 'youtube' ? 0 : lead(item.src)) });
+    const ok = setScreen({ down: true, src: item.src, kind: item.kind, title: item.title, playing: true, pos: item.start || at, cue: cueFor(item.kind, item.src) });
     if (ok !== true) return;
     if (at && !item.start) ctx.toast('Carrying on from ' + fmt(at) + '. “From the start” is in the cinema panel.', 3200);
     prime(item.src);
   }
-  // on a phone the first play() must come from the tap itself; start the element now and let drive() pause it
+  // on a phone the first play() must come from the tap itself; start the element now and let drive() pause it (once:
+  // after that the page may start it whenever the room says, so later starts have no stutter of their own)
   function prime(src) {
     if (!F || F.kind !== 'file' || F.src !== src) return;
     if (F.mode === 'idle') loadSrc();
-    if (video && video.paused) { mark('play'); const p = video.play(); if (p && p.then) p.then(() => { if (!(cur && cur.playing && screenReady() && expected() >= 0)) { mark('pause'); video.pause(); } }, () => {}); }
+    // the tap's play() only unlocks the element: it is stopped again at once, however late the browser confirms it
+    // (Safari can, under load, after the cue), and drive() starts it with the room, from the room's frame
+    // (and seeked back to its frame: Safari, paused that soon after a play, reports the paused time while its own clock
+    // runs on, and the film then started a second ahead)
+    if (video && video.paused && !video.dataset.primed) { const at = video.currentTime; mark('play'); const p = video.play(); if (p && p.then) p.then(() => { video.dataset.primed = '1'; mark('pause'); video.pause(); seekVideo(at); drive(true); }, () => {}); }
   }
   function playFilm(f) { start({ kind: 'file', src: f.files[0], title: filmTitle(f) }); }
-  function pause() { if (cur && cur.src) setScreen({ playing: false, pos: Math.max(0, localTime()) }); }
+  function pause() {                                    // stops here at once (no running on for the round trip, then a jump back)
+    if (!cur || !cur.src) return;
+    const t = Math.max(0, localTime());
+    if (F && F.kind === 'file' && video && !video.paused) { mark('pause'); video.pause(); SY.intent = { playing: false, until: now() + 3000 }; }
+    setScreen({ playing: false, pos: t });
+  }
   function retry() { if (F && F.mode === 'error') { F.mode = 'idle'; F.i = 0; F.cors = true; } }
   function resume() {
     if (!cur || !cur.src) return;
     retry();
     const src = cur.src, from = F && F.ended ? 0 : Math.max(0, cur.pos);
-    if (setScreen({ down: true, playing: true, pos: from - (cur.kind === 'youtube' ? 0 : lead(src)) }) === true) prime(src);
+    if (setScreen({ down: true, playing: true, pos: from, cue: cueFor(cur.kind, src) }) === true) prime(src);
     if (cur && cur.kind === 'youtube' && !viewOpen) openView();
   }
   function restart() {
     if (!cur || !cur.src) return;
     retry();
     const src = cur.src; if (F) F.ended = false;
-    if (setScreen({ down: true, playing: true, pos: -(cur.kind === 'youtube' ? 0 : lead(src)) }) === true) prime(src);
+    if (setScreen({ down: true, playing: true, pos: 0, cue: cueFor(cur.kind, src) }) === true) prime(src);
     if (cur && cur.kind === 'youtube' && !viewOpen) openView();
   }
   function stopFilm() { if (cur && cur.src) { notePlace(cur.src, localTime(), F && F.dur); setScreen({ src: '', title: '', kind: 'file', playing: false, pos: 0 }); } }
@@ -982,7 +1162,7 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
     if (cur && cur.down) setScreen({ down: false, playing: false, pos: cur.src ? Math.max(0, localTime()) : 0 });
     else setScreen({ down: true });
   }
-  function seekTo(t) { if (cur && cur.src) setScreen({ pos: t - (cur.playing && cur.kind === 'file' ? 0.4 : 0) }); }
+  function seekTo(t) { if (cur && cur.src) setScreen({ pos: t }); }
 
   /* --- a pasted link --- */
   function ytId(text) {
@@ -1140,7 +1320,7 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
       }
       // copy each new frame to the screen ourselves (no waiting on requestVideoFrameCallback, which browsers may
       // never call for a video they think nobody sees: ours is hidden, the 3D screen shows it)
-      if (F.mode === 'tex' && video.currentTime !== texAt) relayFrame();
+      if (F.mode === 'tex' && video.currentTime !== texAt && now() - rvfcAt > 250) relayFrame();
     }
     if (A.lamp > 0.003) O.beamMat.uniforms.uT.value += dt;
     drive(false);
@@ -1161,6 +1341,8 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
 
   /* ---------------- what the room's pick-and-act system asks ---------------- */
   const partOf = (t) => ((t && t.object && t.object.userData.pick) || {}).part || 'stand';
+  // no hover glow over a film that is showing (it washed the picture out and outlined it)
+  const quietGlow = (t) => partOf(t) === 'screen' && !!(cur && cur.src && F && (F.mode === 'tex' || F.mode === 'over'));
   function label(t) {
     const part = partOf(t), s = cur;
     if (part === 'cord') return s && s.down ? 'The screen’s pull-cord' : 'A pull-cord: the screen is rolled up in its case';
@@ -1213,11 +1395,15 @@ body:not(.playing) #cineOver,body.reading #cineOver{display:none}
     baseExposure = c.renderer.toneMappingExposure || 1;
     build(); built = true;
     paint();
+    setInterval(() => { if (cur && cur.playing && F && F.kind === 'file' && video) drive(false); }, 250);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && cur && cur.src) { drive(true); wake(); } });   // a phone picked up again
   }
+  // net.js measured the pen's clock better: the film's place moves by the difference (small: speed absorbs it)
+  function reclock() { if (cur) anchor(cur); }
   // for tests: run the animations to their ends now
   function settle(n) { for (let i = 0; i < (n || 160); i++) step(0.05); pose(); return { k: A.k, lift: A.lift, lid: A.lid, lamp: A.lamp }; }
   function state() { return { beam: O.beam && { on: O.beam.visible, verts: O.beam.geometry.attributes.position ? O.beam.geometry.attributes.position.count : 0, uO: O.beamMat.uniforms.uO.value }, cur, mode: F && F.mode, kind: F && F.kind, frame: F && F.frame, dur: F && F.dur, watching, viewOpen, url: F && F.url, time: localTime(), k: A.k, lift: A.lift, lamp: A.lamp, dim: A.dim, exposure: ctx && ctx.renderer.toneMappingExposure, video: !!video, paused: video ? video.paused : null, muted: effMuted(), elMuted: video ? video.muted : null, full: fullVid, blind: !!(F && F.blind), texAt, relay: relayC ? relayC.width + 'x' + relayC.height : null, over: !!O.overOn, overVisible: !!(video && video.parentNode && video.parentNode.id === 'cineOver' && +video.style.opacity > 0.05), overTransform: video && video.parentNode && video.parentNode.id === 'cineOver' ? video.style.transform.slice(0, 40) : null, apple: APPLE }; }
 
   const hasFilm = () => !!(cur && cur.src);
-  return { FILMS, init, sanitize, applyOp, sync, acts, label, open, settle, state, ytId, pickables, fullscreen, toggleMute, setMuted, muted: effMuted, hasFilm, afterRender };
+  return { FILMS, init, sanitize, applyOp, sync, acts, label, open, settle, state, ytId, pickables, fullscreen, toggleMute, setMuted, muted: effMuted, hasFilm, beforeRender, afterRender, reclock, quietGlow, pictureOnPage, sync0: () => ({ ema: +SY.ema.toFixed(3), rate: video ? video.playbackRate : 1, seeks: SY.seeks.slice(), slow: +slowLine().toFixed(2), slowNow: slowNow(), jumpAt: SY.jumpAt, exp: +expected().toFixed(3), t: video ? +video.currentTime.toFixed(3) : null }) };
 })();
